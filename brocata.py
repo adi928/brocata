@@ -47,7 +47,7 @@ def getPayload(line):
             if (within >= 1):
                 regexCond += "{" + int(within).__str__() + "}"
     regexCond += "/"
-    return regexCond, msg
+    return regexCond.replace("(", "\(").replace(")","\)"), msg
 
 def main():
     parser = argparse.ArgumentParser()
@@ -60,16 +60,23 @@ def main():
         for line in f:
             if (line != '\n'):
                 attributes = line.split()
-                print("signature custom_sig"+i.__str__()+" {")
-                print("src-port == " + attributes[3])
-                print("src-ip == " + attributes[2])
-                print("dst-port == " + attributes[6])
-                print("dst-ip == " + attributes[5])
-                print("ip-proto == " + attributes[1])
                 payload, msg = getPayload(line)
-                print("payload " + payload.replace(' ', '\\x'))
-                print("event \""+msg+"\"")
-                print("}\n")
+                sigFile = msg.replace(" ", '')
+                writeFile = open(msg.replace(" ", ''), "w+")
+                writeFile.write("signature "+sigFile+" {\n")
+                if attributes[3] != 'any':
+                    writeFile.write("src-port == " + attributes[3] + '\n')
+                #writeFile.write("src-ip == " + attributes[2] + '\n')
+                if attributes[6] != 'any':
+                    writeFile.write("dst-port == " + attributes[6]+ '\n')
+                #writeFile.write("dst-ip == " + attributes[5] + '\n')
+                if (attributes[1] == 'http' or attributes[1] == 'ftp' or attributes[1] == 'ssh'):
+                    writeFile.write("ip-proto == " + 'tcp' + '\n')
+                else:
+                    writeFile.write("ip-proto == " + attributes[1] + '\n')
+                writeFile.write("payload " + payload.replace(' ', '\\x') + '\n')
+                writeFile.write("event \""+msg+"\"" +'\n')
+                writeFile.write("}\n")
                 i += 1
 
 if __name__ == "__main__":
