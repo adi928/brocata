@@ -1,4 +1,5 @@
-import re;
+import re
+import argparse
 
 def getPayload(line):
     i = 1
@@ -49,9 +50,14 @@ def getPayload(line):
     return regexCond, msg
 
 def main():
-    i=1
-    with open("test2.txt", "r") as f:
-        for line in f: #line1 = f.readline()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("file", help="File for Suricata rules")
+
+    args = parser.parse_args()
+
+    i = 1
+    with open(args.file, "r") as f:
+        for line in f:
             if (line != '\n'):
                 attributes = line.split()
                 print("signature custom_sig"+i.__str__()+" {")
