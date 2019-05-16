@@ -1,18 +1,22 @@
 import re;
 
-def getRegex(line):
+def getPayload(line):
     i = 1
     optDict = {}
     contList = []
     line2 = re.search("\(.*\)", line).group(0)
+    msg = ""
 
     for ele in line2.split(";"):
         eleList = ele.split(":")
         key = eleList[0].__str__().strip().replace('"', '')
+        key = key.replace("(",'')
         # print("Key: " + key)
         if (eleList.__len__() == 2):
             value = eleList[1].__str__().strip().replace('"', '')
             # print("Value: "+value)
+            if key == 'msg':
+                msg = value;
             if (key == 'content'):
                 contList.insert(i, optDict)
                 optDict = {
@@ -42,13 +46,25 @@ def getRegex(line):
             if (within >= 1):
                 regexCond += "{" + int(within).__str__() + "}"
     regexCond += "/"
-    return regexCond
+    return regexCond, msg
 
 def main():
+    i=1
     with open("test2.txt", "r") as f:
         for line in f: #line1 = f.readline()
             if (line != '\n'):
-                print("payload: " + getRegex(line).replace(' ','\\x'))
+                attributes = line.split()
+                print("signature custom_sig"+i.__str__()+" {")
+                print("src-port == " + attributes[3])
+                print("src-ip == " + attributes[2])
+                print("dst-port == " + attributes[6])
+                print("dst-ip == " + attributes[5])
+                print("ip-proto == " + attributes[1])
+                payload, msg = getPayload(line)
+                print("payload " + payload.replace(' ', '\\x'))
+                print("event \""+msg+"\"")
+                print("}\n")
+                i += 1
 
 if __name__ == "__main__":
     main()
