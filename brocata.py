@@ -1,24 +1,35 @@
 import re
 import argparse
 
-def getPayload(line):
-    i = 1
+def getConditions(line):
+    conds = re.search("\(.*\)", line).group(0)
     optDict = {}
     contList = []
-    line2 = re.search("\(.*\)", line).group(0)
-    msg = ""
+    i = 1
 
-    for ele in line2.split(";"):
+    for ele in conds.split(";"):
         eleList = ele.split(":")
         key = eleList[0].__str__().strip().replace('"', '')
-        key = key.replace("(",'')
+        key = key.replace("(", '')
         # print("Key: " + key)
-        if (eleList.__len__() == 2):
+        if key == 'http-method':
+            optDict[key] = 'T'
+        if key == 'http_uri':
+            optDict[key] = 'T'
+        if key == 'http_client_body':
+            optDict[key] = 'T'
+        if key == 'http_header':
+            optDict[key] = 'T'
+
+        if eleList.__len__() == 2:
             value = eleList[1].__str__().strip().replace('"', '')
-            # print("Value: "+value)
+            if key == 'pcre':
+                optDict[key] = value
+            if key == 'flow':
+                optDict[key] = value
             if key == 'msg':
-                msg = value;
-            if (key == 'content'):
+                msg = value
+            if key == 'content':
                 contList.insert(i, optDict)
                 optDict = {
                     "optionId": i
@@ -34,6 +45,9 @@ def getPayload(line):
             if (key == 'within'):
                 optDict[key] = value
     contList.insert(i, optDict)
+    return contList, msg
+
+def getPayload(contList):
     regexCond = "/"
     for options in contList:
         if (options.get('offset') is not None):
@@ -47,7 +61,73 @@ def getPayload(line):
             if (within >= 1):
                 regexCond += "{" + int(within).__str__() + "}"
     regexCond += "/"
-    return regexCond.replace("(", "\(").replace(")","\)"), msg
+    return regexCond.replace("(", "\(").replace(")","\)")
+
+def getFlow(contList):
+    flowStr = "tcp-state "
+    i = 1
+    for options in contList:
+        if options.get('flow') is not None:
+            flows = options.get('flow').split(',')
+            for flow in flows:
+                if i != 1:
+                    flowStr += ','
+                if flow == 'established':
+                    flowStr += flow
+                if flow == 'from_server' or flow == 'to_client':
+                    flowStr += "responder"
+                if flow == 'to_server' or flow == 'from_client':
+                    flowStr += "originator"
+                i += 1
+    return flowStr
+
+def getHttpConditions(contList):
+    httpRequest = ""
+    uri = 1
+
+    httpReqHeader = ""
+    reqHeader = 1
+
+    httpRepHeader = ""
+    repHeader = 1
+
+    httpReqBody = ""
+    reqBody = 1
+
+    httpString = ""
+
+    for options in contList:
+        if options.get('http_uri'):
+            if uri != 1:
+                httpRequest += "|"
+            httpRequest += options.get('content')
+            uri += 1
+        if options.get('http_header') and (options.get('flow') is not None and 'to_server' in options.get('flow')):
+            if reqHeader != 1:
+                httpReqHeader += "|"
+            httpReqHeader += options.get('content')
+            reqHeader += 1
+        if options.get('http_header') and (options.get('flow') is not None and 'from_server' in options.get('flow')):
+            if repHeader != 1:
+                httpReqHeader += "|"
+            httpRepHeader += options.get('content')
+            repHeader += 1
+        if options.get('http_client_body'):
+            if reqBody != 1:
+                httpReqBody += "|"
+            httpReqBody += options.get('content')
+            reqBody += 1
+
+    if httpRequest != '':
+        httpString += "http-request /(" + httpRequest + ")/\n"
+    if httpReqHeader != '':
+        httpString += "http-request-header /(" + httpReqHeader + ")/\n"
+    if httpRepHeader != '':
+        httpString += "http-reply-header /(" + httpRepHeader + ")/\n"
+    if httpReqBody != '':
+        httpString += "http-request-body /(" + httpReqBody + ")/\n"
+
+    return httpString
 
 def main():
     parser = argparse.ArgumentParser()
@@ -59,22 +139,32 @@ def main():
     with open(args.file, "r") as f:
         for line in f:
             if (line != '\n'):
-                attributes = line.split()
-                payload, msg = getPayload(line)
-                sigFile = msg.replace(" ", '')
-                writeFile = open(msg.replace(" ", ''), "w+")
+                conds, msg = getConditions(line)
+
+                print(msg.replace(" ", '').replace("/", ''))
+
+                sigFile = msg.replace(" ", '').replace("/", '')
+                writeFile = open("rules/"+sigFile+'.sig', "w+")
                 writeFile.write("signature "+sigFile+" {\n")
+
+                attributes = line.split()
                 if attributes[3] != 'any':
                     writeFile.write("src-port == " + attributes[3] + '\n')
-                #writeFile.write("src-ip == " + attributes[2] + '\n')
                 if attributes[6] != 'any':
                     writeFile.write("dst-port == " + attributes[6]+ '\n')
-                #writeFile.write("dst-ip == " + attributes[5] + '\n')
                 if (attributes[1] == 'http' or attributes[1] == 'ftp' or attributes[1] == 'ssh'):
                     writeFile.write("ip-proto == " + 'tcp' + '\n')
                 else:
                     writeFile.write("ip-proto == " + attributes[1] + '\n')
+
+                payload = getPayload(conds)
                 writeFile.write("payload " + payload.replace(' ', '\\x') + '\n')
+
+                flowStr = getFlow(conds)
+                writeFile.write(flowStr + '\n')
+
+                writeFile.write(getHttpConditions(conds))
+
                 writeFile.write("event \""+msg+"\"" +'\n')
                 writeFile.write("}\n")
                 i += 1
