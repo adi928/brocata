@@ -39,3 +39,7 @@ Included within are the following attributes from Suricata format:
     * http_request_body
     
 `sig_output` Location for all the generated signatures
+
+##To do:
+* Suricata detects the protocol automatically and is port agnostic which is not directly supported by Bro. The additional logic needs to be added to address the protocol.
+* Add enable script attribute to Bro signatures.  

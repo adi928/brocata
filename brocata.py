@@ -14,7 +14,7 @@ MapVars = {
     "sql_servers": "sql_servers",
     "telnet_servers": "telnet_servers",
     "aim_servers": "aim_servers",
-    "shellcode_ports": "non_shellcode_ports",
+    "shellcode_ports": "shellcode_ports",
     "ssh_ports": "ssh_ports"
 }
 
