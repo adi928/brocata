@@ -37,3 +37,5 @@ Included within are the following attributes from Suricata format:
     * http_request_header
     * http_reply_header
     * http_request_body
+    
+`sig_output` Location for all the generated signatures
