@@ -9,11 +9,13 @@ MapVars = {
     "http_servers": "http_servers",
     "http_ports": "http_ports",
     "oracle_ports": "oracle_ports",
+    "dns_servers": "dns_servers",
     "smtp_servers": "smtp_servers",
     "sql_servers": "sql_servers",
     "telnet_servers": "telnet_servers",
     "aim_servers": "aim_servers",
-    "shellcode_ports": "non_shellcode_ports"
+    "shellcode_ports": "non_shellcode_ports",
+    "ssh_ports": "ssh_ports"
 }
 
 def getConditions(line):
@@ -26,7 +28,6 @@ def getConditions(line):
         eleList = ele.split(":")
         key = eleList[0].__str__().strip().replace('"', '')
         key = key.replace("(", '')
-        # print("Key: " + key)
         if key == 'http-method':
             optDict[key] = 'T'
         if key == 'http_uri':
@@ -62,6 +63,7 @@ def getConditions(line):
     contList.insert(i, optDict)
     return contList, msg
 
+
 def getPayload(contList):
     regexCond = "/"
     for options in contList:
@@ -77,6 +79,7 @@ def getPayload(contList):
                 regexCond += "{" + int(within).__str__() + "}"
     regexCond += "/"
     return regexCond.replace("(", "\(").replace(")","\)")
+
 
 def getFlow(contList):
     flowStr = "tcp-state "
@@ -95,6 +98,7 @@ def getFlow(contList):
                     flowStr += "originator"
                 i += 1
     return flowStr
+
 
 def getHttpConditions(contList):
     httpRequest = ""
@@ -145,12 +149,33 @@ def getHttpConditions(contList):
     return httpString
 
 
+def getPorts(srcPort, dstPort):
+    portStatement = ""
+    if srcPort.startswith('$'):
+        portStatement += "src-port == "+MapVars[srcPort[1:]].__str__()+"\n"
+    else:
+        portStatement += "src-port == " + srcPort + "\n"
+
+    if dstPort.startswith('$'):
+        portStatement += "dst-port == "+MapVars[dstPort[1:]].__str__()+"\n"
+    else:
+        portStatement += "dst-port == " + dstPort + "\n"
+
+    return portStatement
+
+
 def getIP(srcIp, dstIp):
     ipStatement = ""
     if srcIp.startswith('$'):
         ipStatement += "src-ip == "+MapVars[srcIp[1:]].__str__()+"\n"
+    else:
+        ipStatement += "src-ip == " + srcIp + "\n"
+
     if dstIp.startswith('$'):
         ipStatement += "dst-ip == "+MapVars[dstIp[1:]].__str__()+"\n"
+    else:
+        ipStatement += "dst-ip == " + dstIp + "\n"
+
     return ipStatement
 
 
@@ -173,12 +198,11 @@ def main():
                 writeFile.write("signature "+sigFile+" {\n")
 
                 attributes = line.split()
-                if attributes[2].startswith('$') and attributes[5].startswith('$'):
-                    writeFile.write(getIP(attributes[2].lower(), attributes[5].lower()))
-                if attributes[3] == 'any':
-                    writeFile.write("src-port == " + attributes[3] + '\n')
-                if attributes[6] == 'any':
-                    writeFile.write("dst-port == " + attributes[6]+ '\n')
+
+                writeFile.write(getIP(attributes[2].lower(), attributes[5].lower()))
+
+                writeFile.write(getPorts(attributes[3].lower(), attributes[6].lower()))
+
                 if attributes[1] == 'http' or attributes[1] == 'ftp' or attributes[1] == 'ssh':
                     writeFile.write("ip-proto == " + 'tcp' + '\n')
                 else:
