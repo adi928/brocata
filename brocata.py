@@ -134,13 +134,13 @@ def getHttpConditions(contList):
             reqBody += 1
 
     if httpRequest != '':
-        httpString += "http-request /(" + httpRequest + ")/\n"
+        httpString += "http-request /\(" + httpRequest + "\)/\n"
     if httpReqHeader != '':
-        httpString += "http-request-header /(" + httpReqHeader + ")/\n"
+        httpString += "http-request-header /\(" + httpReqHeader + "\)/\n"
     if httpRepHeader != '':
-        httpString += "http-reply-header /(" + httpRepHeader + ")/\n"
+        httpString += "http-reply-header /\(" + httpRepHeader + "\)/\n"
     if httpReqBody != '':
-        httpString += "http-request-body /(" + httpReqBody + ")/\n"
+        httpString += "http-request-body /\(" + httpReqBody + "\)/\n"
 
     return httpString
 
@@ -175,9 +175,9 @@ def main():
                 attributes = line.split()
                 if attributes[2].startswith('$') and attributes[5].startswith('$'):
                     writeFile.write(getIP(attributes[2].lower(), attributes[5].lower()))
-                if attributes[3] != 'any':
+                if attributes[3] == 'any':
                     writeFile.write("src-port == " + attributes[3] + '\n')
-                if attributes[6] != 'any':
+                if attributes[6] == 'any':
                     writeFile.write("dst-port == " + attributes[6]+ '\n')
                 if attributes[1] == 'http' or attributes[1] == 'ftp' or attributes[1] == 'ssh':
                     writeFile.write("ip-proto == " + 'tcp' + '\n')
