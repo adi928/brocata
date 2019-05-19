@@ -1,6 +1,21 @@
 import re
 import argparse
 
+sig_output = "/usr/local/bro/share/bro/site/suricata_rules/"
+
+MapVars = {
+    "external_net": "local_nets",
+    "home_net": "local_nets",
+    "http_servers": "http_servers",
+    "http_ports": "http_ports",
+    "oracle_ports": "oracle_ports",
+    "smtp_servers": "smtp_servers",
+    "sql_servers": "sql_servers",
+    "telnet_servers": "telnet_servers",
+    "aim_servers": "aim_servers",
+    "shellcode_ports": "non_shellcode_ports"
+}
+
 def getConditions(line):
     conds = re.search("\(.*\)", line).group(0)
     optDict = {}
@@ -129,6 +144,16 @@ def getHttpConditions(contList):
 
     return httpString
 
+
+def getIP(srcIp, dstIp):
+    ipStatement = ""
+    if srcIp.startswith('$'):
+        ipStatement += "src-ip == "+MapVars[srcIp[1:]].__str__()+"\n"
+    if dstIp.startswith('$'):
+        ipStatement += "dst-ip == "+MapVars[dstIp[1:]].__str__()+"\n"
+    return ipStatement
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("file", help="File for Suricata rules")
@@ -138,21 +163,23 @@ def main():
     i = 1
     with open(args.file, "r") as f:
         for line in f:
-            if (line != '\n'):
+            if line != '\n':
                 conds, msg = getConditions(line)
 
                 print(msg.replace(" ", '').replace("/", ''))
 
                 sigFile = msg.replace(" ", '').replace("/", '')
-                writeFile = open("rules/"+sigFile+'.sig', "w+")
+                writeFile = open('rules/'+sigFile+'.sig', "w+")
                 writeFile.write("signature "+sigFile+" {\n")
 
                 attributes = line.split()
+                if attributes[2].startswith('$') and attributes[5].startswith('$'):
+                    writeFile.write(getIP(attributes[2].lower(), attributes[5].lower()))
                 if attributes[3] != 'any':
                     writeFile.write("src-port == " + attributes[3] + '\n')
                 if attributes[6] != 'any':
                     writeFile.write("dst-port == " + attributes[6]+ '\n')
-                if (attributes[1] == 'http' or attributes[1] == 'ftp' or attributes[1] == 'ssh'):
+                if attributes[1] == 'http' or attributes[1] == 'ftp' or attributes[1] == 'ssh':
                     writeFile.write("ip-proto == " + 'tcp' + '\n')
                 else:
                     writeFile.write("ip-proto == " + attributes[1] + '\n')
@@ -164,10 +191,10 @@ def main():
                 writeFile.write(flowStr + '\n')
 
                 writeFile.write(getHttpConditions(conds))
-
-                writeFile.write("event \""+msg+"\"" +'\n')
+                writeFile.write("event \""+msg+"\"" + '\n')
                 writeFile.write("}\n")
                 i += 1
+
 
 if __name__ == "__main__":
     main()
