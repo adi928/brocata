@@ -23,6 +23,7 @@ def getConditions(line):
     optDict = {}
     contList = []
     i = 1
+    msg = ""
 
     for ele in conds.split(";"):
         eleList = ele.split(":")
@@ -37,14 +38,16 @@ def getConditions(line):
         if key == 'http_header':
             optDict[key] = 'T'
 
-        if eleList.__len__() == 2:
+        if eleList.__len__() >= 2:
             value = eleList[1].__str__().strip().replace('"', '')
+
             if key == 'pcre':
                 optDict[key] = value
             if key == 'flow':
                 optDict[key] = value
             if key == 'msg':
-                msg = value
+                for opts in eleList:
+                    msg += opts
             if key == 'content':
                 contList.insert(i, optDict)
                 optDict = {
@@ -82,7 +85,7 @@ def getPayload(contList):
 
 
 def getFlow(contList):
-    flowStr = "tcp-state "
+    flowStr = ""
     i = 1
     for options in contList:
         if options.get('flow') is not None:
@@ -97,7 +100,10 @@ def getFlow(contList):
                 if flow == 'to_server' or flow == 'from_client':
                     flowStr += "originator"
                 i += 1
-    return flowStr
+    if flowStr == "tcp-state ":
+        return ''
+    else:
+        return flowStr
 
 
 def getHttpConditions(contList):
@@ -203,7 +209,7 @@ def main():
 
                 writeFile.write(getPorts(attributes[3].lower(), attributes[6].lower()))
 
-                if attributes[1] == 'http' or attributes[1] == 'ftp' or attributes[1] == 'ssh':
+                if attributes[1] == 'http' or attributes[1] == 'ftp' or attributes[1] == 'ssh' or attributes[1] == 'tls':
                     writeFile.write("ip-proto == " + 'tcp' + '\n')
                 else:
                     writeFile.write("ip-proto == " + attributes[1] + '\n')
@@ -212,7 +218,8 @@ def main():
                 writeFile.write("payload " + payload.replace(' ', '\\x') + '\n')
 
                 flowStr = getFlow(conds)
-                writeFile.write(flowStr + '\n')
+                if flowStr != "":
+                    writeFile.write("tcp-state" + flowStr + '\n')
 
                 writeFile.write(getHttpConditions(conds))
                 writeFile.write("event \""+msg+"\"" + '\n')
