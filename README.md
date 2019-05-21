@@ -1,4 +1,4 @@
-# Brocata
+## Brocata
 Porting Suricata to Bro signatures
 
     $ python brocata.py emerging-exploit.rules
@@ -40,6 +40,13 @@ Included within are the following attributes from Suricata format:
     
 `sig_output` Location for all the generated signatures
 
-##To do:
-* Suricata detects the protocol automatically and is port agnostic which is not directly supported by Bro. The additional logic needs to be added to address the protocol.
-* Add enable script attribute to Bro signatures.  
+## Ja3Intel.py
+* Converts the suricata ruleset from abuse.ch to intel format of Bro's Intelligence framework
+
+    ``alert tls any any -> any any (msg:"SSLBL: Malicious JA3 SSL-Client Fingerprint detected (Tofsee)"; ja3_hash; content:"906004246f3ba5e755b043c057254a29"; reference:url, sslbl.abuse.ch/ja3-fingerprints/906004246f3ba5e755b043c057254a29/; sid:906200000; rev:1;)``
+    
+    to
+    
+    ``#fields	indicator	indicator_type	meta.url
+906004246f3ba5e755b043c057254a29	Intel::JA3	sslbl.abuse.ch/ja3-fingerprints/906004246f3ba5e755b043c057254a29/
+`` 
