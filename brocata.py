@@ -46,7 +46,7 @@ def getConditions(line):
             if key == 'flow':
                 optDict[key] = value
             if key == 'msg':
-                for opts in eleList:
+                for opts in eleList[1:]:
                     msg += opts
             if key == 'content':
                 contList.insert(i, optDict)
@@ -64,24 +64,43 @@ def getConditions(line):
             if (key == 'within'):
                 optDict[key] = value
     contList.insert(i, optDict)
-    return contList, msg
+    return contList, msg.replace('"','')
 
 
 def getPayload(contList):
     regexCond = "/"
     for options in contList:
-        if (options.get('offset') is not None):
+        dist = options.get('distance')
+        within = options.get('within')
+        contentStr = ''
+        if options.get('offset') is not None and options.get('offset') != '0':
             regexCond = ".{" + options.get('offset') + "}"
-        if (options.get('distance') is not None):
-            regexCond += ".{" + options.get('distance') + "}"
+        if dist is not None and dist != '0':
+            regexCond += ".{" + dist + "}"
+        if within is not None and within != '0':
+                # The Suricata documentation mentions that 'distance' is a relative content
+                # modifier and it is how much space after the previous content match should this content occur
+                # OTOH, 'within' means that the current expression should occur within x bytes of the
+                # last match. In other words, 'within' and 'distance' act as upper and lower bound, respectively
+                # So in case of 'distance:2 within:2', how is it possible?
+                # It is only possible when 'within' is the upper bound starting from 'distance', the lower bound.
+
+                regexCond += "(?:\w){0,"+within+"}?"
         if (options.get('content') is not None):
-            regexCond += "(" + options.get('content') + ")"
-        if (options.get('within') is not None):
-            within = int(options.get('within')) / 8
-            if (within >= 1):
-                regexCond += "{" + int(within).__str__() + "}"
+            contents = options.get('content').split('|')
+            if contents.__len__() > 1:
+                regexCond += "("
+                for content in contents:
+                    hegex = re.match("^[0-9a-fA-F ]+", content)
+                    if hegex is not None:
+                        contentStr += "\\x" + hegex.group().replace(' ', '\\x')
+                    else:
+                        contentStr += content
+            else:
+                contentStr += content
+            regexCond += contentStr + ")"
     regexCond += "/"
-    return regexCond.replace("(", "\(").replace(")","\)")
+    return regexCond
 
 
 def getFlow(contList):
@@ -196,10 +215,10 @@ def main():
         for line in f:
             if line != '\n':
                 conds, msg = getConditions(line)
+                msg = msg.replace(" ", '').replace("/", '').replace(',', '')
+                print(msg)
 
-                print(msg.replace(" ", '').replace("/", ''))
-
-                sigFile = msg.replace(" ", '').replace("/", '')
+                sigFile = msg
                 writeFile = open('rules/'+sigFile+'.sig', "w+")
                 writeFile.write("signature "+sigFile+" {\n")
 
@@ -219,7 +238,7 @@ def main():
 
                 flowStr = getFlow(conds)
                 if flowStr != "":
-                    writeFile.write("tcp-state" + flowStr + '\n')
+                    writeFile.write("tcp-state " + flowStr + '\n')
 
                 writeFile.write(getHttpConditions(conds))
                 writeFile.write("event \""+msg+"\"" + '\n')
