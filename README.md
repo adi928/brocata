@@ -3,25 +3,17 @@ Porting Suricata to Bro signatures
 
     $ python brocata.py emerging-exploit.rules
     
-    signature GPLEXPLOITx86Linuxmountdoverflow {
-	src-port == any
-	src-ip == $EXTERNAL_NET
-	dst-port == 635
-	dst-ip == $HOME_NET
-	ip-proto == udp
-	payload /(^|B0\x02\x89\x06\xFE\xC8\x89|F|04\xB0\x06\x89|F)/
-	event "GPL EXPLOIT x86 Linux mountd overflow"
-	}
-    
-    signature ETEXPLOITAdobeAcrobatReaderMaliciousURLNullByte {
-	src-port == any
-	src-ip == $HOME_NET
-	dst-port == any
-	dst-ip == $EXTERNAL_NET
-	ip-proto == http
-	payload /(.pdf|00|)/
-	event "ET EXPLOIT Adobe Acrobat Reader Malicious URL Null Byte"
-	}
+    signature NCCGROUPRDPconnectionsetupwithMS_T120channelpotentialCVE-2019-0708 {
+    src-ip == any
+    dst-ip == any
+    src-port == any
+    dst-port == 3389
+    ip-proto == tcp
+    payload /(\x{03}\x{00}).{2}(?:\w){0,2}?(\x{02}\x{f0})(?:\w){0,512}?(\x{00}\x{05}\x{00}\x{14}\x{7c}\x{00}\x{01}).{3}(?:\w){0,384}?(\x{03}\x{c0}).{6}(?:\w){0,372}?(MS_T120\x{00})/
+    tcp-state originator,established
+    event "NCCGROUPRDPconnectionsetupwithMS_T120channelpotentialCVE-2019-0708"
+    }
+
     ...
 
 Included within are the following attributes from Suricata format:

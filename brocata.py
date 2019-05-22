@@ -74,30 +74,36 @@ def getPayload(contList):
         within = options.get('within')
         contentStr = ''
         if options.get('offset') is not None and options.get('offset') != '0':
+            # The jury is still out on when can 'offset' come into play since it only
+            # is relative from the start of the payload.
             regexCond = ".{" + options.get('offset') + "}"
         if dist is not None and dist != '0':
+            # We are skipping the 'distance' number of characters
             regexCond += ".{" + dist + "}"
         if within is not None and within != '0':
-                # The Suricata documentation mentions that 'distance' is a relative content
-                # modifier and it is how much space after the previous content match should this content occur
-                # OTOH, 'within' means that the current expression should occur within x bytes of the
-                # last match. In other words, 'within' and 'distance' act as upper and lower bound, respectively
-                # So in case of 'distance:2 within:2', how is it possible?
-                # It is only possible when 'within' is the upper bound starting from 'distance', the lower bound.
-
-                regexCond += "(?:\w){0,"+within+"}?"
+            # The Suricata documentation mentions that 'distance' is a relative content
+            # modifier and it is how much space after the previous content match should this content occur
+            # OTOH, 'within' means that the current expression should occur within x bytes of the
+            # last match. In other words, 'within' and 'distance' act as upper and lower bound, respectively
+            # So in case of 'distance:2 within:2', how is it possible?
+            # It is only possible when 'within' is the upper bound starting from 'distance', the lower bound.
+            regexCond += "(?:\w){0,"+within+"}?"
         if (options.get('content') is not None):
             contents = options.get('content').split('|')
             if contents.__len__() > 1:
                 regexCond += "("
                 for content in contents:
+                    # Match to weed out hex content.
                     hegex = re.match("^[0-9a-fA-F ]+", content)
+                    # Hex content needs to have a specific format in regex
                     if hegex is not None:
-                        contentStr += "\\x" + hegex.group().replace(' ', '\\x')
+
+                        contentStr += "\\x{" + hegex.group().replace(' ', '}\\x{') + "}"
+                    # Normal content can go as is
                     else:
                         contentStr += content
             else:
-                contentStr += content
+                contentStr += contents[0]
             regexCond += contentStr + ")"
     regexCond += "/"
     return regexCond
