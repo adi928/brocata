@@ -1,19 +1,20 @@
 ## Brocata
 Porting Suricata to Bro signatures
 
-    $ python brocata.py emerging-exploit.rules
-    
-    signature NCCGROUPRDPconnectionsetupwithMS_T120channelpotentialCVE-2019-0708 {
-    src-ip == any
-    dst-ip == any
-    src-port == any
-    dst-port == 3389
-    ip-proto == tcp
-    payload /(\x{03}\x{00}).{2}(?:\w){0,2}?(\x{02}\x{f0})(?:\w){0,512}?(\x{00}\x{05}\x{00}\x{14}\x{7c}\x{00}\x{01}).{3}(?:\w){0,384}?(\x{03}\x{c0}).{6}(?:\w){0,372}?(MS_T120\x{00})/
-    tcp-state originator,established
-    event "NCCGROUPRDPconnectionsetupwithMS_T120channelpotentialCVE-2019-0708"
-    }
+In this example it is converting CVE 2019-078 rule
 
+    $ python brocata.py cve_2019_078.rules
+    
+    signature cve-2019-0708 {
+        src-ip == any
+        dst-ip == any
+        src-port == any
+        dst-port == 3389
+        ip-proto == tcp
+        payload /(\x{03}\x{00}).{2}(?:\w){0,2}?(\x{02}\x{f0})(?:\w){0,512}?(\x{00}\x{05}\x{00}\x{14}\x{7c}\x{00}\x{01}).{3}(?:\w){0,384}?(\x{03}\x{c0}).{6}(?:\w){0,372}?(MS_T120\x{00})/
+        tcp-state originator,established
+        event "NCCGROUP RDP connection setup with MS_T120 channel potential CVE-2019-0708"
+    }
     ...
 
 Included within are the following attributes from Suricata format:
