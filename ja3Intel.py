@@ -11,7 +11,6 @@ def disassemble(line):
             optDicts[atts] = 'true'
         if atts.startswith('content') and optDicts['ja3_hash'] is not None and optDicts['ja3_hash'] == 'true':
             cntTemp = atts.split(':')
-            keyContent = cntTemp[0]
             content = cntTemp[1].replace('"','')
         if atts.startswith('reference'):
             tempUrl = atts.split(',')
@@ -26,12 +25,12 @@ def main():
     args = parser.parse_args()
 
     writeFile = open('intel/ja3.intel', "w+")
-    writeFile.write('#fields\tindicator\tindicator_type\tmeta.url\n')
+    writeFile.write('#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
     with open(args.file, "r") as f:
         for line in f:
             if line.startswith('alert') and line.__contains__('ja3_hash'):
                 fingerprint, url = disassemble(line)
-                writeFile.write(fingerprint + "\tIntel::JA3\t" + url +"\n")
+                writeFile.write(fingerprint + "\tIntel::JA3\t" + url +"\tabuse.ch\n")
 
 
 if __name__ == '__main__':
