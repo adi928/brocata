@@ -1,9 +1,9 @@
 ## Brocata
 Porting Suricata to Bro signatures
 
-In this example it is converting CVE 2019-078 rule
+In this example it is converting CVE 2019-0708 rule
 
-    $ python brocata.py cve_2019_078.rules
+    $ python brocata.py cve_2019_0708.rules
     
     signature cve-2019-0708 {
         src-ip == any
