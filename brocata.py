@@ -1,7 +1,9 @@
 import re
-import argparse
+import os
+import requests
 
 sig_output = "/usr/local/bro/share/bro/site/suricata_rules/"
+loadBro = '__load__.bro'
 
 MapVars = {
     "external_net": "local_nets",
@@ -211,21 +213,26 @@ def getIP(srcIp, dstIp):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("file", help="File for Suricata rules")
+    if os.path.exists(sig_output+loadBro):
+        os.remove(sig_output+loadBro)
 
-    args = parser.parse_args()
+    url = 'https://raw.githubusercontent.com/seanlinmt/suricata/master/files/rules/emerging-exploit.rules'
+    r = requests.get(url, allow_redirects=True)
+    open('emerging-exploit.rules', 'wb').write(r.content)
 
     i = 1
-    with open(args.file, "r") as f:
+    with open('emerging-exploit.rules', "r") as f:
         for line in f:
-            if line != '\n':
+            if line != '\n' and (line.startswith('#alert') or line.startswith('alert')):
                 conds, msg = getConditions(line)
                 msg = msg.replace(" ", '').replace("/", '').replace(',', '')
                 print(msg)
 
+                loadBroFile = open(sig_output+loadBro, 'w+')
+                loadBroFile.write("@load-sigs ./"+msg)
+
                 sigFile = msg
-                writeFile = open('rules/'+sigFile+'.sig', "w+")
+                writeFile = open(sig_output+sigFile+'.sig', "w+")
                 writeFile.write("signature "+sigFile+" {\n")
 
                 attributes = line.split()
