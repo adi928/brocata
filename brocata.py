@@ -216,6 +216,10 @@ def getIP(srcIp, dstIp):
 
 
 def main():
+    # Creating the suricata_rules directory
+    if not os.path.exists(sig_output):
+        os.makedirs(sig_output)
+
     # Remove the existing __load__.bro if it exists
     if os.path.exists(sig_output+loadBro):
         os.remove(sig_output+loadBro)
@@ -241,6 +245,9 @@ def main():
 
     open('emerging-exploit.rules', 'wb').write(r.content)
 
+    # Creating and populating the __load__.bro script for the custom signatures
+    loadBroFile = open(sig_output + loadBro, 'w+')
+
     i = 1
     with open('emerging-exploit.rules', "r") as f:
         for line in f:
@@ -249,8 +256,6 @@ def main():
                 msg = msg.replace(" ", '').replace("/", '').replace(',', '')
                 print(msg)
 
-                # Creating and populating the __load__.bro script for the custom signatures
-                loadBroFile = open(sig_output+loadBro, 'w+')
                 loadBroFile.write("@load-sigs ./"+msg)
 
                 sigFile = msg

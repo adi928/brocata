@@ -15,7 +15,7 @@ def disassemble(line):
         if atts.startswith('reference'):
             tempUrl = atts.split(',')
             url = tempUrl[1]
-    return content,url
+    return content, url
 
 
 def main():
