@@ -1,9 +1,12 @@
 import re
 import os
+import sys
+
 import requests
 
 sig_output = "/usr/local/bro/share/bro/site/suricata_rules/"
 loadBro = '__load__.bro'
+url = 'https://raw.githubusercontent.com/seanlinmt/suricata/master/files/rules/emerging-exploit.rules'
 
 MapVars = {
     "external_net": "local_nets",
@@ -213,11 +216,29 @@ def getIP(srcIp, dstIp):
 
 
 def main():
+    # Remove the existing __load__.bro if it exists
     if os.path.exists(sig_output+loadBro):
         os.remove(sig_output+loadBro)
 
-    url = 'https://raw.githubusercontent.com/seanlinmt/suricata/master/files/rules/emerging-exploit.rules'
-    r = requests.get(url, allow_redirects=True)
+    # Download the emerging-exploits.rules 'seanlinmt' git repo
+    try:
+        r = requests.get(url, allow_redirects=True)
+    except requests.HTTPError as err:
+        print("An HTTP error occured:\n" + err)
+        sys.exit()
+    except requests.Timeout as err:
+        print("The request timed out.\n" + err)
+        sys.exit()
+    except requests.RequestException as err:
+        print("The request had something really bad with it. Bailing now...\n" + err)
+        sys.exit()
+    except requests.ConnectionError as err:
+        print("The connection has not been established and disconnected with an error\n"+err)
+        sys.exit()
+    except requests.SSLError as err:
+        print("The connection has SSL error\n"+err)
+        sys.exit()
+
     open('emerging-exploit.rules', 'wb').write(r.content)
 
     i = 1
@@ -228,10 +249,13 @@ def main():
                 msg = msg.replace(" ", '').replace("/", '').replace(',', '')
                 print(msg)
 
+                # Creating and populating the __load__.bro script for the custom signatures
                 loadBroFile = open(sig_output+loadBro, 'w+')
                 loadBroFile.write("@load-sigs ./"+msg)
 
                 sigFile = msg
+
+                # Creating individual signature files
                 writeFile = open(sig_output+sigFile+'.sig', "w+")
                 writeFile.write("signature "+sigFile+" {\n")
 
@@ -241,7 +265,8 @@ def main():
 
                 writeFile.write(getPorts(attributes[3].lower(), attributes[6].lower()))
 
-                if attributes[1] == 'http' or attributes[1] == 'ftp' or attributes[1] == 'ssh' or attributes[1] == 'tls':
+                if attributes[1] == 'http' or attributes[1] == 'ftp'\
+                        or attributes[1] == 'ssh' or attributes[1] == 'tls':
                     writeFile.write("ip-proto == " + 'tcp' + '\n')
                 else:
                     writeFile.write("ip-proto == " + attributes[1] + '\n')
