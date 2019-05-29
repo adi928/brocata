@@ -3,10 +3,12 @@ import os
 import sys
 
 import requests
+from tqdm import tqdm
 
 sig_output = "/usr/local/bro/share/bro/site/suricata_rules/"
 loadBro = '__load__.bro'
-url = 'https://raw.githubusercontent.com/seanlinmt/suricata/master/files/rules/emerging-exploit.rules'
+url = 'https://rules.emergingthreats.net/open/suricata-4.0/emerging.rules.tar.gz'
+downloadedRules = 'emerging-exploit.tar'
 
 MapVars = {
     "external_net": "local_nets",
@@ -22,6 +24,7 @@ MapVars = {
     "shellcode_ports": "shellcode_ports",
     "ssh_ports": "ssh_ports"
 }
+
 
 def getConditions(line):
     conds = re.search("\(.*\)", line).group(0)
@@ -102,7 +105,6 @@ def getPayload(contList):
                     hegex = re.match("^[0-9a-fA-F ]+", content)
                     # Hex content needs to have a specific format in regex
                     if hegex is not None:
-
                         contentStr += "\\x{" + hegex.group().replace(' ', '}\\x{') + "}"
                     # Normal content can go as is
                     else:
@@ -225,6 +227,7 @@ def main():
         os.remove(sig_output+loadBro)
 
     # Download the emerging-exploits.rules 'seanlinmt' git repo
+    print("Downloading emerging.exploit.rules.tar.gz from:\n" + url)
     try:
         r = requests.get(url, allow_redirects=True)
     except requests.HTTPError as err:
@@ -243,51 +246,64 @@ def main():
         print("The connection has SSL error\n"+err)
         sys.exit()
 
-    open('emerging-exploit.rules', 'wb').write(r.content)
+    open(downloadedRules, 'wb').write(r.content)
+
+    print("Unzipping the tar files..")
+    os.system("tar xvf "+downloadedRules)
+
+    ruleFile = "rules/emerging-exploit.rules"
 
     # Creating and populating the __load__.bro script for the custom signatures
-    loadBroFile = open(sig_output + loadBro, 'w+')
+    loadBroFile = open(sig_output + loadBro, 'a+')
 
     i = 1
-    with open('emerging-exploit.rules', "r") as f:
-        for line in f:
+
+    outputFile = 'emerging-exploit.sig'
+    outputWriter = open(outputFile, 'w+')
+
+    print("Starting to compose rules...")
+    with open(ruleFile, "r") as f:
+        for line in tqdm(f, ascii=True, desc="emerging-exploit.rules", unit=" lines"):
             if line != '\n' and (line.startswith('#alert') or line.startswith('alert')):
+
                 conds, msg = getConditions(line)
                 msg = msg.replace(" ", '').replace("/", '').replace(',', '')
-                print(msg)
 
-                loadBroFile.write("@load-sigs ./"+msg)
+                loadBroFile.write("@load-sigs ./"+msg +'\n')
 
                 sigFile = msg
 
-                # Creating individual signature files
-                writeFile = open(sig_output+sigFile+'.sig', "w+")
-                writeFile.write("signature "+sigFile+" {\n")
+                # Creating individual signatures
+                outputWriter.write("signature "+sigFile+" {\n")
 
                 attributes = line.split()
 
-                writeFile.write(getIP(attributes[2].lower(), attributes[5].lower()))
+                outputWriter.write(getIP(attributes[2].lower(), attributes[5].lower()))
 
-                writeFile.write(getPorts(attributes[3].lower(), attributes[6].lower()))
+                outputWriter.write(getPorts(attributes[3].lower(), attributes[6].lower()))
 
                 if attributes[1] == 'http' or attributes[1] == 'ftp'\
                         or attributes[1] == 'ssh' or attributes[1] == 'tls':
-                    writeFile.write("ip-proto == " + 'tcp' + '\n')
+                    outputWriter.write("ip-proto == " + 'tcp' + '\n')
                 else:
-                    writeFile.write("ip-proto == " + attributes[1] + '\n')
+                    outputWriter.write("ip-proto == " + attributes[1] + '\n')
 
                 payload = getPayload(conds)
-                writeFile.write("payload " + payload.replace(' ', '\\x') + '\n')
+                outputWriter.write("payload " + payload.replace(' ', '\\x') + '\n')
 
                 flowStr = getFlow(conds)
                 if flowStr != "":
-                    writeFile.write("tcp-state " + flowStr + '\n')
+                    outputWriter.write("tcp-state " + flowStr + '\n')
 
-                writeFile.write(getHttpConditions(conds))
-                writeFile.write("event \""+msg+"\"" + '\n')
-                writeFile.write("}\n")
+                outputWriter.write(getHttpConditions(conds))
+                outputWriter.write("event \""+msg+"\"" + '\n')
+                outputWriter.write("}\n\n")
                 i += 1
 
+    print("Generated "+i + " signatures...")
+    outputWriter.close()
+    loadBroFile.close()
+    os.system('rm -rf rules/')
 
 if __name__ == "__main__":
     main()
