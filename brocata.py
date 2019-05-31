@@ -299,7 +299,7 @@ def main():
                 outputWriter.write("}\n\n")
                 i += 1
 
-    print("Generated "+i + " signatures...")
+    print("Generated "+i.__str__() + " signatures...")
     outputWriter.close()
     loadBroFile.close()
     os.system('rm -rf rules/')
