@@ -1,5 +1,7 @@
+import io
 import sys
 import requests
+import os
 
 sslURL = 'https://sslbl.abuse.ch/blacklist/sslblacklist.csv'
 sslBlocklistCSV = 'sslBlocklist.csv'
@@ -35,23 +37,23 @@ def sslBlockList():
 
     open(sslBlocklistCSV, 'wb').write(r.content)
 
-    with open(sslBlocklistCSV, encoding='ISO-8859-1') as cvsfile:
-        lineCount = 0
-        writeFile = open(sslBlocklistDAT, 'w+')
-        for line in cvsfile:
-            if line.startswith('# Listing') or lineCount >= 1:
-                row = line.replace('#', '').replace('"', '')
-                sslComp = row.split(',')
-                if sslComp.__len__() <= 1:
-                    continue
-                if lineCount == 0:
-                    writeFile.write('#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
-                    lineCount += 1
-                else:
-                    writeFile.write(
-                        sslComp[1] + '\tIntel::FILE_HASH' + '\thttps://sslbl.abuse.ch/ssl-certificates/sha1/' \
-                        + sslComp[1] + '\tabuse.ch\n')
-                    lineCount += 1
+    cvsfile = io.open(sslBlocklistCSV, 'r', encoding='ISO-8859-1')
+    lineCount = 0
+    writeFile = open(sslBlocklistDAT, 'w+')
+    for line in cvsfile:
+        if line.startswith('# Listing') or lineCount >= 1:
+            row = line.replace('#', '').replace('"', '')
+            sslComp = row.split(',')
+            if sslComp.__len__() <= 1:
+                continue
+            if lineCount == 0:
+                writeFile.write('#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
+                lineCount += 1
+            else:
+                writeFile.write(
+                    sslComp[1] + '\tIntel::FILE_HASH' + '\thttps://sslbl.abuse.ch/ssl-certificates/sha1/' \
+                    + sslComp[1] + '\tabuse.ch\n')
+                lineCount += 1
 
 
 def ja3Fingerprint():
@@ -76,24 +78,24 @@ def ja3Fingerprint():
 
     open(ja3CSV, 'wb').write(r.content)
 
-    with open(ja3CSV, newline='', encoding='ISO-8859-1') as cvsfile:
-        lineCount = 0
-        ja3writeFile = open(ja3DAT, 'w+')
-        for line in cvsfile:
-            if line.startswith('# ja3') or lineCount >= 1:
-                row = line.replace('#', '').replace('"', '')
-                ja3Comp = row.split(',')
-                if ja3Comp.__len__() <= 1:
-                    continue
-                if lineCount == 0:
-                    ja3writeFile.write('#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
-                    lineCount += 1
-                else:
-                    ja3writeFile.write(
-                        ja3Comp[0] + '\tIntel::JA3' + '\thttps://sslbl.abuse.ch/ja3-fingerprints/' \
-                        + ja3Comp[0] + '\tabuse.ch\n')
-                    lineCount += 1
-        ja3writeFile.close()
+    cvsfile = io.open(ja3CSV, 'r', encoding='ISO-8859-1')
+    lineCount = 0
+    ja3writeFile = open(ja3DAT, 'w+')
+    for line in cvsfile:
+        if line.startswith('# ja3') or lineCount >= 1:
+            row = line.replace('#', '').replace('"', '')
+            ja3Comp = row.split(',')
+            if ja3Comp.__len__() <= 1:
+                continue
+            if lineCount == 0:
+                ja3writeFile.write('#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
+                lineCount += 1
+            else:
+                ja3writeFile.write(
+                    ja3Comp[0] + '\tIntel::JA3' + '\thttps://sslbl.abuse.ch/ja3-fingerprints/' \
+                    + ja3Comp[0] + '\tabuse.ch\n')
+                lineCount += 1
+    ja3writeFile.close()
 
 
 def ransomewareBlocklist():
@@ -118,50 +120,51 @@ def ransomewareBlocklist():
 
     open(ransomewareCSV, 'wb').write(r.content)
 
-    with open(ransomewareCSV, newline='', encoding='ISO-8859-1') as csvfile:
-        lineCount = 0
-        rwWriteFile = open(ransomewareDAT, 'w+')
-        for line in csvfile:
-            if line.startswith('# Firstseen') or lineCount >= 1:
-                line = line.replace('#', '').replace('"', '')
-                components = line.split(',')
-                if components.__len__() <= 1:
-                    continue
-                if lineCount == 0:
-                    rwWriteFile.write('#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
-                    lineCount += 1
+    csvfile = io.open(ransomewareCSV, 'r', encoding='ISO-8859-1')
+    lineCount = 0
+    rwWriteFile = open(ransomewareDAT, 'w+')
+    for line in csvfile:
+        if line.startswith('# Firstseen') or lineCount >= 1:
+            line = line.replace('#', '').replace('"', '')
+            components = line.split(',')
+            if components.__len__() <= 1:
+                continue
+            if lineCount == 0:
+                rwWriteFile.write('#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
+                lineCount += 1
+            else:
+                domain = ''
+                if components[3] == components[7]:
+                    ips = components[7].split('|')
                 else:
-                    domain = ''
-                    if components[3] == components[7]:
-                        ips = components[7].split('|')
-                    else:
-                        domain = components[3]
+                    domain = components[3]
 
-                    url = components[4]
+                url = components[4]
 
-                    for ip in ips:
-                        ipIntelStr = ip + '\tIntel::ADDR' + '\thttps://ransomwaretracker.abuse.ch/feeds/' + '\t' \
-                                     + components[1] + '-' + components[2] + components[6] + '-' + components[8] + '-' + \
+                for ip in ips:
+                    ipIntelStr = ip + '\tIntel::ADDR' + '\thttps://ransomwaretracker.abuse.ch/feeds/' + '\t' \
+                                 + components[1] + '-' + components[2] + components[6] + '-' + components[8] + '-' + \
+                                 components[9]
+                    rwWriteFile.write(ipIntelStr)
+
+                if domain != '':
+                    domainIntelStr = domain + '\tIntel::DOMAIN' + '\thttps://ransomwaretracker.abuse.ch/feeds/' + '\t' \
+                                     + components[1] + '-' + components[2] + components[6] + '-' + components[
+                                         8] + '-' + \
                                      components[9]
-                        rwWriteFile.write(ipIntelStr)
+                    rwWriteFile.write(domainIntelStr)
 
-                    if domain != '':
-                        domainIntelStr = domain + '\tIntel::DOMAIN' + '\thttps://ransomwaretracker.abuse.ch/feeds/' + '\t' \
-                                         + components[1] + '-' + components[2] + components[6] + '-' + components[
-                                             8] + '-' + \
-                                         components[9]
-                        rwWriteFile.write(domainIntelStr)
-
-                    if url != '':
-                        urlIntelStr = url + '\tIntel::URL' + '\thttps://ransomwaretracker.abuse.ch/feeds/' + '\t' \
-                                      + components[1] + '-' + components[2] + components[6] + '-' + components[
-                                          8] + '-' + \
-                                      components[9]
-                        rwWriteFile.write(urlIntelStr)
-                    lineCount += 1
-        rwWriteFile.close()
+                if url != '':
+                    urlIntelStr = url + '\tIntel::URL' + '\thttps://ransomwaretracker.abuse.ch/feeds/' + '\t' \
+                                  + components[1] + '-' + components[2] + components[6] + '-' + components[
+                                      8] + '-' + \
+                                  components[9]
+                    rwWriteFile.write(urlIntelStr)
+                lineCount += 1
+    rwWriteFile.close()
 
 def main():
+    os.system('python --version')
     # Convert the ssl blocklist feeds
     sslBlockList()
     # Convert the ja3 blocklist feeds
