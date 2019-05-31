@@ -252,6 +252,8 @@ def main():
 
     ruleFile = "rules/emerging-exploit.rules"
 
+    os.system('rm -rf '+downloadedRules)
+
     # Creating and populating the __load__.bro script for the custom signatures
     loadBroFile = open(sig_output + loadBro, 'a+')
 

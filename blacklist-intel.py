@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import sys
 import requests
 
@@ -37,7 +35,7 @@ def sslBlockList():
 
     open(sslBlocklistCSV, 'wb').write(r.content)
 
-    with open(sslBlocklistCSV, newline='', encoding='ISO-8859-1') as cvsfile:
+    with open(sslBlocklistCSV, encoding='ISO-8859-1') as cvsfile:
         lineCount = 0
         writeFile = open(sslBlocklistDAT, 'w+')
         for line in cvsfile:
