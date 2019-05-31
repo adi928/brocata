@@ -1,7 +1,6 @@
 import io
 import sys
 import requests
-import os
 
 sslURL = 'https://sslbl.abuse.ch/blacklist/sslblacklist.csv'
 sslBlocklistCSV = 'sslBlocklist.csv'
@@ -164,7 +163,6 @@ def ransomewareBlocklist():
     rwWriteFile.close()
 
 def main():
-    os.system('python --version')
     # Convert the ssl blocklist feeds
     sslBlockList()
     # Convert the ja3 blocklist feeds
