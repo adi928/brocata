@@ -258,7 +258,7 @@ def main():
     i = 1
 
     outputFile = 'emerging-exploit.sig'
-    outputWriter = open(outputFile, 'w+')
+    outputWriter = open(sig_output+outputFile, 'w+')
 
     print("Starting to compose rules...")
     with open(ruleFile, "r") as f:
