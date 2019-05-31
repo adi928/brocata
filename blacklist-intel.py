@@ -14,6 +14,7 @@ ransomwareURL = 'https://ransomwaretracker.abuse.ch/feeds/csv/'
 ransomewareCSV = 'ransomewaretracker.csv'
 ransomewareDAT = 'ransomewaretracker.dat'
 
+
 def sslBlockList():
     # Download the ssl blocklist feeds
     try:
@@ -34,11 +35,11 @@ def sslBlockList():
         print("The connection has SSL error\n" + err)
         sys.exit()
 
-    open(sslBlocklistCSV, 'wb').write(r.content)
+    io.open(sslBlocklistCSV, 'wb').write(r.content)
 
     cvsfile = io.open(sslBlocklistCSV, 'r', encoding='ISO-8859-1')
     lineCount = 0
-    writeFile = open(sslBlocklistDAT, 'w+')
+    writeFile = io.open(sslBlocklistDAT, 'w+',  encoding='ISO-8859-1')
     for line in cvsfile:
         if line.startswith('# Listing') or lineCount >= 1:
             row = line.replace('#', '').replace('"', '')
@@ -46,7 +47,7 @@ def sslBlockList():
             if sslComp.__len__() <= 1:
                 continue
             if lineCount == 0:
-                writeFile.write('#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
+                writeFile.write(u'#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
                 lineCount += 1
             else:
                 writeFile.write(
@@ -75,11 +76,11 @@ def ja3Fingerprint():
         print("The connection has SSL error\n" + err)
         sys.exit()
 
-    open(ja3CSV, 'wb').write(r.content)
+    io.open(ja3CSV, 'wb').write(r.content)
 
     cvsfile = io.open(ja3CSV, 'r', encoding='ISO-8859-1')
     lineCount = 0
-    ja3writeFile = open(ja3DAT, 'w+')
+    ja3writeFile = io.open(ja3DAT, 'w+', encoding='ISO-8859-1')
     for line in cvsfile:
         if line.startswith('# ja3') or lineCount >= 1:
             row = line.replace('#', '').replace('"', '')
@@ -87,7 +88,7 @@ def ja3Fingerprint():
             if ja3Comp.__len__() <= 1:
                 continue
             if lineCount == 0:
-                ja3writeFile.write('#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
+                ja3writeFile.write(u'#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
                 lineCount += 1
             else:
                 ja3writeFile.write(
@@ -117,11 +118,11 @@ def ransomewareBlocklist():
         print("The connection has SSL error\n" + err)
         sys.exit()
 
-    open(ransomewareCSV, 'wb').write(r.content)
+    io.open(ransomewareCSV, 'wb').write(r.content)
 
     csvfile = io.open(ransomewareCSV, 'r', encoding='ISO-8859-1')
     lineCount = 0
-    rwWriteFile = open(ransomewareDAT, 'w+')
+    rwWriteFile = io.open(ransomewareDAT, 'w+', encoding='ISO-8859-1')
     for line in csvfile:
         if line.startswith('# Firstseen') or lineCount >= 1:
             line = line.replace('#', '').replace('"', '')
@@ -129,7 +130,7 @@ def ransomewareBlocklist():
             if components.__len__() <= 1:
                 continue
             if lineCount == 0:
-                rwWriteFile.write('#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
+                rwWriteFile.write(u'#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
                 lineCount += 1
             else:
                 domain = ''
