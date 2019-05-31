@@ -3,7 +3,6 @@ import os
 import sys
 
 import requests
-from tqdm import tqdm
 
 sig_output = "/usr/local/bro/share/bro/site/suricata_rules/"
 loadBro = '__load__.bro'
@@ -263,7 +262,7 @@ def main():
 
     print("Starting to compose rules...")
     with open(ruleFile, "r") as f:
-        for line in tqdm(f, ascii=True, desc="emerging-exploit.rules", unit=" lines"):
+        for line in f:
             if line != '\n' and (line.startswith('#alert') or line.startswith('alert')):
 
                 conds, msg = getConditions(line)
