@@ -254,9 +254,6 @@ def main():
 
     os.system('rm -rf '+downloadedRules)
 
-    # Creating and populating the __load__.bro script for the custom signatures
-    loadBroFile = open(sig_output + loadBro, 'a+')
-
     i = 1
 
     outputFile = 'emerging-exploit.sig'
@@ -269,8 +266,6 @@ def main():
 
                 conds, msg = getConditions(line)
                 msg = msg.replace(" ", '').replace("/", '').replace(',', '')
-
-                loadBroFile.write("@load-sigs ./"+msg +'\n')
 
                 sigFile = msg
 
@@ -303,7 +298,13 @@ def main():
 
     print("Generated "+i.__str__() + " signatures...")
     outputWriter.close()
+
+    # Creating and populating the __load__.bro script for the custom signatures
+    loadBroFile = open(sig_output + loadBro, 'a+')
+    loadBroFile.write("@load-sigs ./" + outputFile[:-4] + '\n')
     loadBroFile.close()
+
+    #Remove the superfluous rules folder
     os.system('rm -rf rules/')
 
 if __name__ == "__main__":

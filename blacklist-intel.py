@@ -1,4 +1,5 @@
 import io
+import os
 import sys
 import requests
 
@@ -14,6 +15,7 @@ ransomwareURL = 'https://ransomwaretracker.abuse.ch/feeds/csv/'
 ransomewareCSV = 'ransomewaretracker.csv'
 ransomewareDAT = 'ransomewaretracker.dat'
 
+sig_output = "/usr/local/bro/share/bro/site/intel/"
 
 def sslBlockList():
     # Download the ssl blocklist feeds
@@ -163,6 +165,20 @@ def ransomewareBlocklist():
                 lineCount += 1
     rwWriteFile.close()
 
+
+def createLoadFile():
+    createLoadBro = '@load frameworks/intel/seen\n\nredef Intel::read_files += {\nfmt("%s/' + ransomewareDAT + '", @DIR)\n};\
+        \n\nredef Intel::read_files += {\nfmt("%s/' + ja3DAT + '", @DIR)\n};\n\nredef Intel::read_files += {\nfmt("%s/' + sslBlocklistDAT + '", @DIR)\n}'
+
+    # Creating the suricata_rules directory
+    if not os.path.exists(sig_output):
+        os.makedirs(sig_output)
+
+    loadBroWrite = io.open(sig_output + '__load__.bro', 'w+')
+    loadBroWrite.write(createLoadBro)
+    loadBroWrite.close()
+
+
 def main():
     # Convert the ssl blocklist feeds
     sslBlockList()
@@ -170,6 +186,13 @@ def main():
     ja3Fingerprint()
     # Convert the ransomeware blocklist feeds
     ransomewareBlocklist()
+    #Create the accompanying load bro file
+    createLoadFile()
+
+    #Finally move all the files to sig_output location and get rid of the clutter
+    os.system('cp '+ransomewareDAT+' '+ja3DAT+' '+sslBlocklistDAT+' '+sig_output)
+    os.system('rm -rf '+ransomewareDAT+' '+ja3DAT+' '+sslBlocklistDAT)
+    os.system('rm -rf ' + ransomewareCSV + ' ' + ja3CSV + ' ' + sslBlocklistCSV)
 
 if __name__ == '__main__':
     main()
