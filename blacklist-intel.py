@@ -138,10 +138,11 @@ def urlBlocklist():
                 urlHausWriteFile.write(u'#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
                 lineCount += 1
             else:
+                onlyURL = urlComp[2].split('://')[1]
                 urlHausWriteFile.write(
-                    urlComp[2] + '\tIntel::URL' + '\t'+urlComp[-2] + '\tabuse.ch\n')
+                    onlyURL + '\tIntel::URL' + '\t'+urlComp[-2] + '\tabuse.ch\n')
                 lineCount += 1
-        urlHausWriteFile.close()
+    urlHausWriteFile.close()
 
 
 def ransomewareBlocklist():
