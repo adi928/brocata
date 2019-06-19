@@ -15,6 +15,10 @@ ransomwareURL = 'https://ransomwaretracker.abuse.ch/feeds/csv/'
 ransomewareCSV = 'ransomewaretracker.csv'
 ransomewareDAT = 'ransomewaretracker.dat'
 
+URLHaus = 'https://urlhaus.abuse.ch/downloads/csv/'
+urlCSV = 'urlhaus.csv'
+urlDAT = 'urlhaus.dat'
+
 sig_output = "/usr/local/bro/share/bro/site/intel/"
 
 def sslBlockList():
@@ -99,6 +103,46 @@ def ja3Fingerprint():
                 lineCount += 1
     ja3writeFile.close()
 
+def urlBlocklist():
+    # Download the URL blocklist feeds
+    try:
+        r = requests.get(URLHaus, allow_redirects=True)
+    except requests.HTTPError as err:
+        print("An HTTP error occured:\n" + err)
+        sys.exit()
+    except requests.Timeout as err:
+        print("The request timed out.\n" + err)
+        sys.exit()
+    except requests.RequestException as err:
+        print("The request had something really bad with it. Bailing now...\n" + err)
+        sys.exit()
+    except requests.ConnectionError as err:
+        print("The connection has not been established and disconnected with an error\n" + err)
+        sys.exit()
+    except requests.SSLError as err:
+        print("The connection has SSL error\n" + err)
+        sys.exit()
+
+    io.open(urlCSV, 'wb').write(r.content)
+
+    cvsfile = io.open(urlCSV, 'r', encoding='ISO-8859-1')
+    lineCount = 0
+    urlHausWriteFile = io.open(urlDAT, 'w+', encoding='ISO-8859-1')
+    for line in cvsfile:
+        if line.startswith('# id') or lineCount >= 1:
+            row = line.replace('#', '').replace('"', '')
+            urlComp = row.split(',')
+            if urlComp.__len__() <= 1:
+                continue
+            if lineCount == 0:
+                urlHausWriteFile.write(u'#fields\tindicator\tindicator_type\tmeta.url\tmeta.source\n')
+                lineCount += 1
+            else:
+                urlHausWriteFile.write(
+                    urlComp[2] + '\tIntel::URL' + '\t'+urlComp[-2] + '\tabuse.ch\n')
+                lineCount += 1
+        urlHausWriteFile.close()
+
 
 def ransomewareBlocklist():
     # Download the ransomware blocklist feeds
@@ -168,7 +212,7 @@ def ransomewareBlocklist():
 
 def createLoadFile():
     createLoadBro = '@load frameworks/intel/seen\n\nredef Intel::read_files += {\nfmt("%s/' + ransomewareDAT + '", @DIR)\n};\
-        \n\nredef Intel::read_files += {\nfmt("%s/' + ja3DAT + '", @DIR)\n};\n\nredef Intel::read_files += {\nfmt("%s/' + sslBlocklistDAT + '", @DIR)\n}'
+        \n\nredef Intel::read_files += {\nfmt("%s/' + ja3DAT + '", @DIR)\n};\n\nredef Intel::read_files += {\nfmt("%s/' + sslBlocklistDAT + '", @DIR)\n};\n\nredef Intel::read_files += {\nfmt("%s/' + urlDAT + '", @DIR)\n}'
 
     # Creating the suricata_rules directory
     if not os.path.exists(sig_output):
@@ -186,13 +230,15 @@ def main():
     ja3Fingerprint()
     # Convert the ransomeware blocklist feeds
     ransomewareBlocklist()
+    # Convert the url blocklist feeds
+    urlBlocklist()
     #Create the accompanying load bro file
     createLoadFile()
 
     #Finally move all the files to sig_output location and get rid of the clutter
-    os.system('cp '+ransomewareDAT+' '+ja3DAT+' '+sslBlocklistDAT+' '+sig_output)
-    os.system('rm -rf '+ransomewareDAT+' '+ja3DAT+' '+sslBlocklistDAT)
-    os.system('rm -rf ' + ransomewareCSV + ' ' + ja3CSV + ' ' + sslBlocklistCSV)
+    os.system('cp '+ransomewareDAT+' '+ja3DAT+' '+sslBlocklistDAT+' '+urlDAT+' '+sig_output)
+    os.system('rm -rf '+ransomewareDAT+' '+ja3DAT+' '+sslBlocklistDAT+' '+urlDAT)
+    os.system('rm -rf ' + ransomewareCSV + ' ' + ja3CSV + ' ' + sslBlocklistCSV+' '+urlCSV)
 
 if __name__ == '__main__':
     main()
