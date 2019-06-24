@@ -10,18 +10,18 @@ url = 'https://rules.emergingthreats.net/open/suricata-4.0/emerging.rules.tar.gz
 downloadedRules = 'emerging-exploit.tar'
 
 MapVars = {
-    "external_net": "local_nets",
-    "home_net": "local_nets",
-    "http_servers": "http_servers",
-    "http_ports": "http_ports",
-    "oracle_ports": "oracle_ports",
-    "dns_servers": "dns_servers",
-    "smtp_servers": "smtp_servers",
-    "sql_servers": "sql_servers",
-    "telnet_servers": "telnet_servers",
-    "aim_servers": "aim_servers",
-    "shellcode_ports": "shellcode_ports",
-    "ssh_ports": "ssh_ports"
+    "external_net": "10.0.0.0/24",
+    "home_net": "10.0.0.0/24",
+    "http_servers": "8.0.8.0",
+    "http_ports": "80",
+    "oracle_ports": "11.11.11.11",
+    "dns_servers": "8.8.8.8",
+    "smtp_servers": "10.0.0.11",
+    "sql_servers": "10.0.0.10",
+    "telnet_servers": "9.9.9.9",
+    "aim_servers": "10.10.10.0/24",
+    "shellcode_ports": "987,789",
+    "ssh_ports": "22"
 }
 
 
@@ -83,7 +83,7 @@ def getPayload(contList):
         if options.get('offset') is not None and options.get('offset') != '0':
             # The jury is still out on when can 'offset' come into play since it only
             # is relative from the start of the payload.
-            regexCond = ".{" + options.get('offset') + "}"
+            regexCond += ".{" + options.get('offset') + "}"
         if dist is not None and dist != '0':
             # We are skipping the 'distance' number of characters
             regexCond += ".{" + dist + "}"
@@ -94,25 +94,27 @@ def getPayload(contList):
             # last match. In other words, 'within' and 'distance' act as upper and lower bound, respectively
             # So in case of 'distance:2 within:2', how is it possible?
             # It is only possible when 'within' is the upper bound starting from 'distance', the lower bound.
-            regexCond += "(?:\w){0,"+within+"}?"
+            regexCond += "[A-Za-z0-9_]{0,"+within+"}?"
         if (options.get('content') is not None):
             contents = options.get('content').split('|')
             if contents.__len__() > 1:
-                regexCond += "("
                 for content in contents:
                     # Match to weed out hex content.
                     hegex = re.match("^[0-9a-fA-F ]+", content)
                     # Hex content needs to have a specific format in regex
                     if hegex is not None:
-                        contentStr += "\\x{" + hegex.group().replace(' ', '}\\x{') + "}"
+                        contentStr += "\\x" + hegex.group().replace(' ', '\\x')
                     # Normal content can go as is
                     else:
                         contentStr += content
             else:
                 contentStr += contents[0]
-            regexCond += contentStr + ")"
+            regexCond += contentStr.replace('/','\/')
     regexCond += "/"
-    return regexCond
+    return regexCond.replace('(', '\(').replace('{','\{')\
+                    .replace('}','\}').replace('?','\?')\
+                    .replace(')', '\)').replace('*','\*')\
+                    .replace('+', '\+')
 
 
 def getFlow(contList):
@@ -122,30 +124,26 @@ def getFlow(contList):
         if options.get('flow') is not None:
             flows = options.get('flow').split(',')
             for flow in flows:
-                if i != 1:
-                    flowStr += ','
+                flow = flow.strip()
                 if flow == 'established':
                     flowStr += flow
                 if flow == 'from_server' or flow == 'to_client':
                     flowStr += "responder"
                 if flow == 'to_server' or flow == 'from_client':
                     flowStr += "originator"
-                i += 1
+                flowStr += ','
     if flowStr == "tcp-state ":
         return ''
     else:
-        return flowStr
+        return re.sub(r'^,|,$', '', flowStr)
 
 
 def getHttpConditions(contList):
     httpRequest = ""
     uri = 1
 
-    httpReqHeader = ""
-    reqHeader = 1
-
-    httpRepHeader = ""
-    repHeader = 1
+    headerStr = ""
+    headerCount = 1
 
     httpReqBody = ""
     reqBody = 1
@@ -153,67 +151,181 @@ def getHttpConditions(contList):
     httpString = ""
 
     for options in contList:
+        ## HTTP methods like GET and POST will go within payload.
         if options.get('http_uri'):
             if uri != 1:
                 httpRequest += "|"
             httpRequest += options.get('content')
             uri += 1
-        if options.get('http_header') and (options.get('flow') is not None and 'to_server' in options.get('flow')):
-            if reqHeader != 1:
-                httpReqHeader += "|"
-            httpReqHeader += options.get('content')
-            reqHeader += 1
-        if options.get('http_header') and (options.get('flow') is not None and 'from_server' in options.get('flow')):
-            if repHeader != 1:
-                httpReqHeader += "|"
-            httpRepHeader += options.get('content')
-            repHeader += 1
+        if options.get('http_header'):
+            headerStr += options.get('content')
+            headerCount += 1
         if options.get('http_client_body'):
             if reqBody != 1:
                 httpReqBody += "|"
             httpReqBody += options.get('content')
             reqBody += 1
 
+    hexesInUri = httpRequest.split('|')
+    uriCleaned = ''
+    for hex in hexesInUri:
+        hegex = re.match("^[0-9a-fA-F ]+", hex)
+        if hegex is not None:
+            uriCleaned += "\\x" + hegex.group().replace(' ', '\\x')
+            # Normal content can go as is
+        else:
+            uriCleaned += hex
+    uriCleaned = uriCleaned.replace('(', '\(').replace('{','\{')\
+                    .replace('}','\}').replace('?','\?')\
+                    .replace(')', '\)').replace('*','\*')\
+                    .replace('+', '\+')
+
+    hexesInHeaderStr = headerStr.split('|')
+    headerCleaned = ''
+    for hex in hexesInHeaderStr:
+        hegex = re.match("^[0-9a-fA-F ]+", hex)
+        if hegex is not None:
+            headerCleaned += "\\x" + hegex.group().replace(' ', '\\x')
+            # Normal content can go as is
+        else:
+            headerCleaned += hex
+    headerCleaned = headerCleaned.replace('(', '\(').replace('{','\{')\
+                    .replace('}','\}').replace('?','\?')\
+                    .replace(')', '\)').replace('*','\*')\
+                    .replace('+', '\+')
+
+    hexesInReqStr = httpReqBody.split('|')
+    requestBodyCleaned = ''
+    for hex in hexesInReqStr:
+        hegex = re.match("^[0-9a-fA-F ]+", hex)
+        if hegex is not None:
+            requestBodyCleaned += "\\x" + hegex.group().replace(' ', '\\x')
+            # Normal content can go as is
+        else:
+            requestBodyCleaned += hex
+    requestBodyCleaned = requestBodyCleaned.replace('(', '\(').replace('{','\{')\
+                    .replace('}','\}').replace('?','\?')\
+                    .replace(')', '\)').replace('*','\*')\
+                    .replace('+', '\+')
+
     if httpRequest != '':
-        httpString += "http-request /\(" + httpRequest + "\)/\n"
-    if httpReqHeader != '':
-        httpString += "http-request-header /\(" + httpReqHeader + "\)/\n"
-    if httpRepHeader != '':
-        httpString += "http-reply-header /\(" + httpRepHeader + "\)/\n"
+        httpString += "http-request /" + uriCleaned.replace('/', '\/') + "/\n"
+    if headerStr != '':
+        httpString += "http-request-header /" + headerCleaned.replace('/', '\/') + "/\n"
+        httpString += "http-reply-header /" + headerCleaned.replace('/', '\/') + "/\n"
     if httpReqBody != '':
-        httpString += "http-request-body /\(" + httpReqBody + "\)/\n"
+        httpString += "http-request-body /" + requestBodyCleaned.replace('/', '\/') + "/\n"
 
     return httpString
 
+def processPorts(port):
+    portStr = ''
+    notPorts = ''
+    if port.startswith('!'):
+        notPorts += port.replace('!', '').replace(':', ',') + ','
+    elif port.startswith('$'):
+        portStr = MapVars[port[1:]].__str__()
+    elif port.__contains__(':'):
+        # Todo: remove the logic of replacing ! from in front of port ranges. It shouldn't be there
+        # in the first place as per suricata rules, but one of the rule is having it, so we'll change
+        # it later.
+        if port.split(':')[0].replace('!', '') == '':
+            lowerLimitPort = 1
+        else:
+            lowerLimitPort = int(port.split(':')[0].replace('!', ''))
+
+        if port.split(':')[1].replace('!', '') == '':
+            upperLimitPort = 65535
+        else:
+            upperLimitPort = int(port.split(':')[1].replace('!', ''))
+
+        for eachPort in range(lowerLimitPort, upperLimitPort):
+            portStr += eachPort.__str__() + ','
+    else:
+        portStr += port + ','
+
+    return portStr, notPorts
 
 def getPorts(srcPort, dstPort):
-    portStatement = ""
-    if srcPort.startswith('$'):
-        portStatement += "src-port == "+MapVars[srcPort[1:]].__str__()+"\n"
-    else:
-        portStatement += "src-port == " + srcPort + "\n"
+    srcPortStr = ''
+    notSrcPortStr = ''
+    portStatement = ''
+    if srcPort != 'any':
+        srcPort = re.sub(r'^\[|\]$', '', srcPort)
+        ## This evaluation is important to root out a grouped negation
+        negateSrcPort = re.findall(r'!\[([^\]]+)\]', srcPort)
+        for eachPort in negateSrcPort:
+            if ':' in eachPort:
+                for singlePort in eachPort.split(','):
+                    tmp1, ignorethis = processPorts(singlePort)
+                    notSrcPortStr += tmp1
+            else:
+                notSrcPortStr += eachPort
+        srcPort = srcPort.split(',![')[0]
+        for eachPort in srcPort.split(','):
+            tmp1, tmp2 = processPorts(eachPort)
+            srcPortStr += tmp1
+            if tmp2 != '':
+                if notSrcPortStr != '':
+                    notSrcPortStr += ',' + tmp2
+                else:
+                    notSrcPortStr += tmp2
 
-    if dstPort.startswith('$'):
-        portStatement += "dst-port == "+MapVars[dstPort[1:]].__str__()+"\n"
-    else:
-        portStatement += "dst-port == " + dstPort + "\n"
+    dstPortStr = ''
+    notDstPortStr = ''
+    if dstPort != 'any':
+        dstPort = re.sub(r'^\[|\]$', '', dstPort)
+        ## This evaluation is important to root out a grouped negation
+        negateDstPort = re.findall(r'!\[([^\]]+)\]', dstPort)
+        for eachPort in negateDstPort:
+            if ':' in eachPort:
+                for singlePort in eachPort.split(','):
+                    tmp1, ignorethis = processPorts(singlePort)
+                    notDstPortStr += tmp1
+            else:
+                notDstPortStr += eachPort
+        dstPort = dstPort.split('![')[0]
+        for eachPort in dstPort.split(','):
+            tmp1, tmp2 = processPorts(eachPort)
+            dstPortStr += tmp1
+            if tmp2 != '':
+                if notDstPortStr != '':
+                    notDstPortStr += ',' + tmp2
+                else:
+                    notDstPortStr += tmp2
+
+    if srcPortStr.strip() != ',' and srcPortStr.strip() != '':
+        portStatement += 'src-port == ' + re.sub(r',+$', '', srcPortStr) + '\n'
+    if notSrcPortStr.strip() != ',' and notSrcPortStr.strip() != '':
+        portStatement += 'src-port != ' + re.sub(r',+$', '', notSrcPortStr) + '\n'
+    if dstPortStr.strip() != ',' and dstPortStr.strip() != '':
+        portStatement += 'dst-port == ' + re.sub(r',+$', '', dstPortStr) + '\n'
+    if notDstPortStr.strip() != ',' and notDstPortStr.strip() != '':
+        portStatement += 'dst-port != ' + re.sub(r',+$', '', notDstPortStr) + '\n'
 
     return portStatement
 
 
 def getIP(srcIp, dstIp):
     ipStatement = ""
-    if srcIp.startswith('$'):
-        ipStatement += "src-ip == "+MapVars[srcIp[1:]].__str__()+"\n"
-    else:
-        ipStatement += "src-ip == " + srcIp + "\n"
+    srcIp = re.sub(r'\[|\]|,$', '', srcIp)
+    dstIp = re.sub(r'\[|\]|,$', '', dstIp)
 
-    if dstIp.startswith('$'):
-        ipStatement += "dst-ip == "+MapVars[dstIp[1:]].__str__()+"\n"
-    else:
-        ipStatement += "dst-ip == " + dstIp + "\n"
+    if srcIp != 'any':
+        for eachSrcIp in srcIp.split(','):
+            if eachSrcIp.startswith('$'):
+                ipStatement += "src-ip == " + MapVars[eachSrcIp[1:]].__str__() + "\n"
+            else:
+                ipStatement += "src-ip == " + eachSrcIp + "\n"
 
-    return ipStatement
+    if dstIp != 'any':
+        for eachDstIp in dstIp.split(','):
+            if eachDstIp.startswith('$'):
+                ipStatement += "dst-ip == " + MapVars[eachDstIp[1:]].__str__() + "\n"
+            else:
+                ipStatement += "dst-ip == " + eachDstIp + "\n"
+
+    return ipStatement.replace('!', '')
 
 
 def main():
@@ -265,12 +377,13 @@ def main():
             if line != '\n' and (line.startswith('#alert') or line.startswith('alert')):
 
                 conds, msg = getConditions(line)
-                msg = msg.replace(" ", '').replace("/", '').replace(',', '')
+                msg = re.sub(r'\W','',msg)
+                    #msg.replace(" ", '').replace("/", '').replace(',', '').replace('.', '').replace('(', '').replace(')', '')
 
                 sigFile = msg
 
                 # Creating individual signatures
-                outputWriter.write("signature "+sigFile+" {\n")
+                outputWriter.write("signature sig"+i.__str__()+ " {\n")
 
                 attributes = line.split()
 
@@ -281,15 +394,18 @@ def main():
                 if attributes[1] == 'http' or attributes[1] == 'ftp'\
                         or attributes[1] == 'ssh' or attributes[1] == 'tls':
                     outputWriter.write("ip-proto == " + 'tcp' + '\n')
-                else:
+                elif attributes[1] == 'tcp' or attributes[1] == 'udp'\
+                        or attributes[1] == 'icmp' or attributes[1] == 'icmp6' \
+                        or attributes[1] == 'ip'\
+                        or attributes[1] == 'ip6':
                     outputWriter.write("ip-proto == " + attributes[1] + '\n')
 
                 payload = getPayload(conds)
-                outputWriter.write("payload " + payload.replace(' ', '\\x') + '\n')
+                outputWriter.write("payload " + payload + '\n')
 
                 flowStr = getFlow(conds)
                 if flowStr != "":
-                    outputWriter.write("tcp-state " + flowStr + '\n')
+                    outputWriter.write("tcp-state " + re.sub(r',+$','',flowStr) + '\n')
 
                 outputWriter.write(getHttpConditions(conds))
                 outputWriter.write("event \""+msg+"\"" + '\n')
