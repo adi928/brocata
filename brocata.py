@@ -10,18 +10,7 @@ url = 'https://rules.emergingthreats.net/open/suricata-4.0/emerging.rules.tar.gz
 downloadedRules = 'emerging-exploit.tar'
 
 MapVars = {
-    "external_net": "10.0.0.0/24",
-    "home_net": "10.0.0.0/24",
-    "http_servers": "8.0.8.0",
-    "http_ports": "80",
-    "oracle_ports": "11.11.11.11",
-    "dns_servers": "8.8.8.8",
-    "smtp_servers": "10.0.0.11",
-    "sql_servers": "10.0.0.10",
-    "telnet_servers": "9.9.9.9",
-    "aim_servers": "10.10.10.0/24",
-    "shellcode_ports": "987,789",
-    "ssh_ports": "22"
+    "home_net": "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16"
 }
 
 
@@ -63,13 +52,13 @@ def getConditions(line):
                 i += 1
                 optDict[key] = value
             if (key == 'depth'):
-                optDict[key] = value
+                optDict[key] = (int(value).__abs__()).__str__()
             if (key == 'offset'):
-                optDict[key] = value
+                optDict[key] = (int(value).__abs__()).__str__()
             if (key == 'distance'):
-                optDict[key] = value
+                optDict[key] = (int(value).__abs__()).__str__()
             if (key == 'within'):
-                optDict[key] = value
+                optDict[key] = (int(value).__abs__()).__str__()
     contList.insert(i, optDict)
     return contList, msg.replace('"','')
 
@@ -100,7 +89,7 @@ def getPayload(contList):
             if contents.__len__() > 1:
                 for content in contents:
                     # Match to weed out hex content.
-                    hegex = re.match("^[0-9a-fA-F ]+", content)
+                    hegex = re.match("(?:([a-fA-F0-9]{2})\s?)+", content)
                     # Hex content needs to have a specific format in regex
                     if hegex is not None:
                         contentStr += "\\x" + hegex.group().replace(' ', '\\x')
@@ -109,12 +98,12 @@ def getPayload(contList):
                         contentStr += content
             else:
                 contentStr += contents[0]
-            regexCond += contentStr.replace('/','\/')
-    regexCond += "/"
-    return regexCond.replace('(', '\(').replace('{','\{')\
+            regexCond += contentStr.replace('/','\/').replace('(', '\(').replace('{','\{')\
                     .replace('}','\}').replace('?','\?')\
                     .replace(')', '\)').replace('*','\*')\
                     .replace('+', '\+')
+    regexCond += "/"
+    return regexCond
 
 
 def getFlow(contList):
@@ -169,7 +158,7 @@ def getHttpConditions(contList):
     hexesInUri = httpRequest.split('|')
     uriCleaned = ''
     for hex in hexesInUri:
-        hegex = re.match("^[0-9a-fA-F ]+", hex)
+        hegex = re.match("(?:([a-fA-F0-9]{2})\s?)+", hex)
         if hegex is not None:
             uriCleaned += "\\x" + hegex.group().replace(' ', '\\x')
             # Normal content can go as is
@@ -183,7 +172,7 @@ def getHttpConditions(contList):
     hexesInHeaderStr = headerStr.split('|')
     headerCleaned = ''
     for hex in hexesInHeaderStr:
-        hegex = re.match("^[0-9a-fA-F ]+", hex)
+        hegex = re.match("(?:([a-fA-F0-9]{2})\s?)+", hex)
         if hegex is not None:
             headerCleaned += "\\x" + hegex.group().replace(' ', '\\x')
             # Normal content can go as is
@@ -197,7 +186,7 @@ def getHttpConditions(contList):
     hexesInReqStr = httpReqBody.split('|')
     requestBodyCleaned = ''
     for hex in hexesInReqStr:
-        hegex = re.match("^[0-9a-fA-F ]+", hex)
+        hegex = re.match("(?:([a-fA-F0-9]{2})\s?)+", hex)
         if hegex is not None:
             requestBodyCleaned += "\\x" + hegex.group().replace(' ', '\\x')
             # Normal content can go as is
@@ -224,7 +213,7 @@ def processPorts(port):
     if port.startswith('!'):
         notPorts += port.replace('!', '').replace(':', ',') + ','
     elif port.startswith('$'):
-        portStr = MapVars[port[1:]].__str__()
+        pass
     elif port.__contains__(':'):
         # Todo: remove the logic of replacing ! from in front of port ranges. It shouldn't be there
         # in the first place as per suricata rules, but one of the rule is having it, so we'll change
@@ -258,13 +247,15 @@ def getPorts(srcPort, dstPort):
             if ':' in eachPort:
                 for singlePort in eachPort.split(','):
                     tmp1, ignorethis = processPorts(singlePort)
-                    notSrcPortStr += tmp1
+                    if tmp1 != '':
+                        notSrcPortStr += tmp1
             else:
                 notSrcPortStr += eachPort
         srcPort = srcPort.split(',![')[0]
         for eachPort in srcPort.split(','):
             tmp1, tmp2 = processPorts(eachPort)
-            srcPortStr += tmp1
+            if tmp1 != 1:
+                srcPortStr += tmp1
             if tmp2 != '':
                 if notSrcPortStr != '':
                     notSrcPortStr += ',' + tmp2
@@ -281,13 +272,15 @@ def getPorts(srcPort, dstPort):
             if ':' in eachPort:
                 for singlePort in eachPort.split(','):
                     tmp1, ignorethis = processPorts(singlePort)
-                    notDstPortStr += tmp1
+                    if tmp1 != '':
+                        notSrcPortStr += tmp1
             else:
                 notDstPortStr += eachPort
         dstPort = dstPort.split('![')[0]
         for eachPort in dstPort.split(','):
             tmp1, tmp2 = processPorts(eachPort)
-            dstPortStr += tmp1
+            if tmp1 != '':
+                dstPortStr += tmp1
             if tmp2 != '':
                 if notDstPortStr != '':
                     notDstPortStr += ',' + tmp2
@@ -313,17 +306,13 @@ def getIP(srcIp, dstIp):
 
     if srcIp != 'any':
         for eachSrcIp in srcIp.split(','):
-            if eachSrcIp.startswith('$'):
+            if eachSrcIp[1:] in MapVars.keys():
                 ipStatement += "src-ip == " + MapVars[eachSrcIp[1:]].__str__() + "\n"
-            else:
-                ipStatement += "src-ip == " + eachSrcIp + "\n"
 
     if dstIp != 'any':
         for eachDstIp in dstIp.split(','):
-            if eachDstIp.startswith('$'):
+            if eachDstIp[1:] in MapVars.keys():
                 ipStatement += "dst-ip == " + MapVars[eachDstIp[1:]].__str__() + "\n"
-            else:
-                ipStatement += "dst-ip == " + eachDstIp + "\n"
 
     return ipStatement.replace('!', '')
 
@@ -379,8 +368,6 @@ def main():
                 conds, msg = getConditions(line)
                 msg = re.sub(r'\W','',msg)
                     #msg.replace(" ", '').replace("/", '').replace(',', '').replace('.', '').replace('(', '').replace(')', '')
-
-                sigFile = msg
 
                 # Creating individual signatures
                 outputWriter.write("signature sig"+i.__str__()+ " {\n")
