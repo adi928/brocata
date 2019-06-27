@@ -146,6 +146,11 @@ def getHttpConditions(contList):
                 httpRequest += "|"
             httpRequest += options.get('content')
             uri += 1
+        if options.get('uricontent'):
+            if uri != 1:
+                httpRequest += "|"
+            httpRequest += options.get('uricontent')
+            uri += 1
         if options.get('http_header'):
             headerStr += options.get('content')
             headerCount += 1
@@ -167,7 +172,7 @@ def getHttpConditions(contList):
     uriCleaned = uriCleaned.replace('(', '\(').replace('{','\{')\
                     .replace('}','\}').replace('?','\?')\
                     .replace(')', '\)').replace('*','\*')\
-                    .replace('+', '\+')
+                    .replace('+', '\+').replace('/', '\/')
 
     hexesInHeaderStr = headerStr.split('|')
     headerCleaned = ''
@@ -198,7 +203,7 @@ def getHttpConditions(contList):
                     .replace('+', '\+')
 
     if httpRequest != '':
-        httpString += "http-request /" + uriCleaned.replace('/', '\/') + "/\n"
+        httpString += "http-request /" + uriCleaned + "/\n"
     if headerStr != '':
         httpString += "http-request-header /" + headerCleaned.replace('/', '\/') + "/\n"
         httpString += "http-reply-header /" + headerCleaned.replace('/', '\/') + "/\n"
@@ -369,34 +374,37 @@ def main():
                 msg = re.sub(r'\W','',msg)
                     #msg.replace(" ", '').replace("/", '').replace(',', '').replace('.', '').replace('(', '').replace(')', '')
 
-                # Creating individual signatures
-                outputWriter.write("signature sig"+i.__str__()+ " {\n")
-
-                attributes = line.split()
-
-                outputWriter.write(getIP(attributes[2].lower(), attributes[5].lower()))
-
-                outputWriter.write(getPorts(attributes[3].lower(), attributes[6].lower()))
-
-                if attributes[1] == 'http' or attributes[1] == 'ftp'\
-                        or attributes[1] == 'ssh' or attributes[1] == 'tls':
-                    outputWriter.write("ip-proto == " + 'tcp' + '\n')
-                elif attributes[1] == 'tcp' or attributes[1] == 'udp'\
-                        or attributes[1] == 'icmp' or attributes[1] == 'icmp6' \
-                        or attributes[1] == 'ip'\
-                        or attributes[1] == 'ip6':
-                    outputWriter.write("ip-proto == " + attributes[1] + '\n')
-
                 payload = getPayload(conds)
-                outputWriter.write("payload " + payload + '\n')
+                if payload == '//':
+                    continue
+                else:
+                    # Creating individual signatures
+                    outputWriter.write("signature sig" + i.__str__() + " {\n")
 
-                flowStr = getFlow(conds)
-                if flowStr != "":
-                    outputWriter.write("tcp-state " + re.sub(r',+$','',flowStr) + '\n')
+                    attributes = line.split()
 
-                outputWriter.write(getHttpConditions(conds))
-                outputWriter.write("event \""+msg+"\"" + '\n')
-                outputWriter.write("}\n\n")
+                    outputWriter.write(getIP(attributes[2].lower(), attributes[5].lower()))
+
+                    outputWriter.write(getPorts(attributes[3].lower(), attributes[6].lower()))
+
+                    if attributes[1] == 'http' or attributes[1] == 'ftp' \
+                            or attributes[1] == 'ssh' or attributes[1] == 'tls':
+                        outputWriter.write("ip-proto == " + 'tcp' + '\n')
+                    elif attributes[1] == 'tcp' or attributes[1] == 'udp' \
+                            or attributes[1] == 'icmp' or attributes[1] == 'icmp6' \
+                            or attributes[1] == 'ip' \
+                            or attributes[1] == 'ip6':
+                        outputWriter.write("ip-proto == " + attributes[1] + '\n')
+
+                    outputWriter.write("payload " + payload + '\n')
+
+                    flowStr = getFlow(conds)
+                    if flowStr != "":
+                        outputWriter.write("tcp-state " + re.sub(r',+$', '', flowStr) + '\n')
+
+                    outputWriter.write(getHttpConditions(conds))
+                    outputWriter.write("event \"" + msg + "\"" + '\n')
+                    outputWriter.write("}\n\n")
                 i += 1
 
     print("Generated "+i.__str__() + " signatures...")
