@@ -37,7 +37,7 @@ def getConditions(line):
         if eleList.__len__() >= 2:
             value = eleList[1].__str__().strip().replace('"', '')
 
-            if key == 'pcre':
+            if key == 'isdataat':
                 optDict[key] = value
             if key == 'flow':
                 optDict[key] = value
@@ -95,11 +95,14 @@ def getPayload(contList):
                         contentStr += "\\x" + hegex.group().replace(' ', '\\x')
                     # Normal content can go as is
                     else:
-                        contentStr += content
+                        contentStr += content.replace('{','\{').replace('}','\}')
             else:
-                contentStr += contents[0]
-            regexCond += contentStr.replace('/','\/').replace('(', '\(').replace('{','\{')\
-                    .replace('}','\}').replace('?','\?')\
+                contentStr += contents[0].replace('{','\{').replace('}','\}')
+            IsdataatValue = options.get('isdataat')
+            if (IsdataatValue is not None) and not IsdataatValue.startswith('!'):
+                contentStr += '[^\s]{'+ IsdataatValue.split(',')[0]+'}'
+            regexCond += contentStr.replace('/','\/').replace('(', '\(')\
+                    .replace('?','\?')\
                     .replace(')', '\)').replace('*','\*')\
                     .replace('+', '\+')
     regexCond += "/"
