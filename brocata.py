@@ -4,7 +4,8 @@ import sys
 
 import requests
 
-sig_output = "/usr/local/bro/share/bro/site/suricata_rules/"
+baseDirectory = "/usr/local/bro/share/bro/site/"
+sig_output = "suricata_rules/"
 loadBro = '__load__.bro'
 url = 'https://rules.emergingthreats.net/open/suricata-4.0/emerging.rules.tar.gz'
 downloadedRules = 'emerging-exploit.tar'
@@ -22,7 +23,7 @@ def getConditions(line):
     msg = ""
 
     for ele in conds.split(";"):
-        eleList = ele.split(":")
+        eleList = ele.split(":",1)
         key = eleList[0].__str__().strip().replace('"', '')
         key = key.replace("(", '')
         if key == 'http-method':
@@ -38,6 +39,10 @@ def getConditions(line):
             value = eleList[1].__str__().strip().replace('"', '')
 
             if key == 'isdataat':
+                optDict[key] = value
+            if key == 'uricontent':
+                optDict[key] = value
+            if key == 'pcre':
                 optDict[key] = value
             if key == 'flow':
                 optDict[key] = value
@@ -55,55 +60,59 @@ def getConditions(line):
                 optDict[key] = (int(value).__abs__()).__str__()
             if (key == 'offset'):
                 optDict[key] = (int(value).__abs__()).__str__()
-            if (key == 'distance'):
+            if (key == 'distance') and isinstance(value, int):
                 optDict[key] = (int(value).__abs__()).__str__()
-            if (key == 'within'):
+            if (key == 'within') and isinstance(value, int):
                 optDict[key] = (int(value).__abs__()).__str__()
     contList.insert(i, optDict)
-    return contList, msg.replace('"','')
+    return contList, msg.replace('"', '')
 
 
 def getPayload(contList):
     regexCond = "/"
     for options in contList:
-        dist = options.get('distance')
-        within = options.get('within')
-        contentStr = ''
-        if options.get('offset') is not None and options.get('offset') != '0':
-            # The jury is still out on when can 'offset' come into play since it only
-            # is relative from the start of the payload.
-            regexCond += ".{" + options.get('offset') + "}"
-        if dist is not None and dist != '0':
-            # We are skipping the 'distance' number of characters
-            regexCond += ".{" + dist + "}"
-        if within is not None and within != '0':
-            # The Suricata documentation mentions that 'distance' is a relative content
-            # modifier and it is how much space after the previous content match should this content occur
-            # OTOH, 'within' means that the current expression should occur within x bytes of the
-            # last match. In other words, 'within' and 'distance' act as upper and lower bound, respectively
-            # So in case of 'distance:2 within:2', how is it possible?
-            # It is only possible when 'within' is the upper bound starting from 'distance', the lower bound.
-            regexCond += "[A-Za-z0-9_]{0,"+within+"}?"
-        if (options.get('content') is not None):
-            contents = options.get('content').split('|')
-            if contents.__len__() > 1:
-                for content in contents:
-                    # Match to weed out hex content.
-                    hegex = re.match("(?:([a-fA-F0-9]{2})\s?)+", content)
-                    # Hex content needs to have a specific format in regex
-                    if hegex is not None:
-                        contentStr += "\\x" + hegex.group().replace(' ', '\\x')
-                    # Normal content can go as is
-                    else:
-                        contentStr += content.replace('{','\{').replace('}','\}')
-            else:
-                contentStr += contents[0].replace('{','\{').replace('}','\}')
-            IsdataatValue = options.get('isdataat')
-            if (IsdataatValue is not None) and not IsdataatValue.startswith('!'):
-                contentStr += '[^\s]{'+ IsdataatValue.split(',')[0]+'}'
-            regexCond += contentStr.replace('/','\/').replace('(', '\(')\
-                    .replace('?','\?')\
-                    .replace(')', '\)').replace('*','\*')\
+        pcreStr = options.get('pcre')
+        if pcreStr is not None and '?P<' not in pcreStr and '?:' not in pcreStr:
+            regexCond += re.sub(r'^/|/[a-zA-Z]*$', '', options.get('pcre'))
+        else:
+            dist = options.get('distance')
+            within = options.get('within')
+            contentStr = ''
+            if options.get('offset') is not None and options.get('offset') != '0':
+                # The jury is still out on when can 'offset' come into play since it only
+                # is relative from the start of the payload.
+                regexCond += ".{" + options.get('offset') + "}"
+            if dist is not None and dist != '0':
+                # We are skipping the 'distance' number of characters
+                regexCond += ".{" + dist + "}"
+            if within is not None and within != '0':
+                # The Suricata documentation mentions that 'distance' is a relative content
+                # modifier and it is how much space after the previous content match should this content occur
+                # OTOH, 'within' means that the current expression should occur within x bytes of the
+                # last match. In other words, 'within' and 'distance' act as upper and lower bound, respectively
+                # So in case of 'distance:2 within:2', how is it possible?
+                # It is only possible when 'within' is the upper bound starting from 'distance', the lower bound.
+                regexCond += "[A-Za-z0-9_]{0," + within + "}?"
+            if (options.get('content') is not None):
+                contents = options.get('content').split('|')
+                if contents.__len__() > 1:
+                    for content in contents:
+                        # Match to weed out hex content.
+                        hegex = re.match("(?:([a-fA-F0-9]{2})\s?)+", content)
+                        # Hex content needs to have a specific format in regex
+                        if hegex is not None:
+                            contentStr += "\\x" + hegex.group().replace(' ', '\\x')
+                        # Normal content can go as is
+                        else:
+                            contentStr += content.replace('{', '\{').replace('}', '\}')
+                else:
+                    contentStr += contents[0].replace('{', '\{').replace('}', '\}')
+                IsdataatValue = options.get('isdataat')
+                if (IsdataatValue is not None) and not IsdataatValue.startswith('!'):
+                    contentStr += '[^\s]{' + IsdataatValue.split(',')[0] + '}'
+                regexCond += contentStr.replace('/', '\/').replace('(', '\(') \
+                    .replace('?', '\?') \
+                    .replace(')', '\)').replace('*', '\*') \
                     .replace('+', '\+')
     regexCond += "/"
     return regexCond
@@ -111,7 +120,6 @@ def getPayload(contList):
 
 def getFlow(contList):
     flowStr = ""
-    i = 1
     for options in contList:
         if options.get('flow') is not None:
             flows = options.get('flow').split(',')
@@ -325,48 +333,11 @@ def getIP(srcIp, dstIp):
     return ipStatement.replace('!', '')
 
 
-def main():
-    # Creating the suricata_rules directory
-    if not os.path.exists(sig_output):
-        os.makedirs(sig_output)
-
-    # Remove the existing __load__.bro if it exists
-    if os.path.exists(sig_output+loadBro):
-        os.remove(sig_output+loadBro)
-
-    # Download the emerging-exploits.rules 'seanlinmt' git repo
-    print("Downloading emerging.exploit.rules.tar.gz from:\n" + url)
-    try:
-        r = requests.get(url, allow_redirects=True)
-    except requests.HTTPError as err:
-        print("An HTTP error occured:\n" + err)
-        sys.exit()
-    except requests.Timeout as err:
-        print("The request timed out.\n" + err)
-        sys.exit()
-    except requests.RequestException as err:
-        print("The request had something really bad with it. Bailing now...\n" + err)
-        sys.exit()
-    except requests.ConnectionError as err:
-        print("The connection has not been established and disconnected with an error\n"+err)
-        sys.exit()
-    except requests.SSLError as err:
-        print("The connection has SSL error\n"+err)
-        sys.exit()
-
-    open(downloadedRules, 'wb').write(r.content)
-
-    print("Unzipping the tar files..")
-    os.system("tar xvf "+downloadedRules)
-
-    ruleFile = "rules/emerging-exploit.rules"
-
-    os.system('rm -rf '+downloadedRules)
-
+def writeSignatures(ruleFile):
     i = 1
 
     outputFile = 'emerging-exploit.sig'
-    outputWriter = open(sig_output+outputFile, 'w+')
+    outputWriter = open(sig_output + outputFile, 'w+')
 
     print("Starting to compose rules...")
     with open(ruleFile, "r") as f:
@@ -374,8 +345,8 @@ def main():
             if line != '\n' and (line.startswith('#alert') or line.startswith('alert')):
 
                 conds, msg = getConditions(line)
-                msg = re.sub(r'\W','',msg)
-                    #msg.replace(" ", '').replace("/", '').replace(',', '').replace('.', '').replace('(', '').replace(')', '')
+                msg = re.sub(r'\W', '', msg)
+                # msg.replace(" ", '').replace("/", '').replace(',', '').replace('.', '').replace('(', '').replace(')', '')
 
                 payload = getPayload(conds)
                 if payload == '//':
@@ -410,7 +381,7 @@ def main():
                     outputWriter.write("}\n\n")
                 i += 1
 
-    print("Generated "+i.__str__() + " signatures...")
+    print("Generated " + i.__str__() + " signatures...")
     outputWriter.close()
 
     # Creating and populating the __load__.bro script for the custom signatures
@@ -418,7 +389,49 @@ def main():
     loadBroFile.write("@load-sigs ./" + outputFile[:-4] + '\n')
     loadBroFile.close()
 
-    #Remove the superfluous rules folder
+def main():
+    # Creating the suricata_rules directory
+    if not os.path.exists(sig_output):
+        os.makedirs(sig_output)
+
+    # Remove the existing __load__.bro if it exists
+    if os.path.exists(sig_output+loadBro):
+        os.remove(sig_output+loadBro)
+
+    # Download the emerging-exploits.rules 'seanlinmt' git repo
+    print("Downloading emerging.exploit.rules.tar.gz from:\n" + url)
+    try:
+        r = requests.get(url, allow_redirects=True)
+    except requests.HTTPError as err:
+        print("An HTTP error occured:\n" + err)
+        sys.exit()
+    except requests.Timeout as err:
+        print("The request timed out.\n" + err)
+        sys.exit()
+    except requests.RequestException as err:
+        print("The request had something really bad with it. Bailing now...\n" + err)
+        sys.exit()
+    except requests.ConnectionError as err:
+        print("The connection has not been established and disconnected with an error\n"+err)
+        sys.exit()
+    except requests.SSLError as err:
+        print("The connection has SSL error\n"+err)
+        sys.exit()
+
+    open(downloadedRules, 'wb').write(r.content)
+
+    print("Unzipping the tar files..")
+    os.system("tar xvf "+downloadedRules)
+
+    rulesDir = "rules/"
+
+    for filename in os.listdir("rules"):
+        if filename.endswith('.rules'):
+            ruleFile = rulesDir + filename
+            writeSignatures(ruleFile)
+
+    # Remove the superfluous rules folder
+    os.system('rm -rf ' + downloadedRules)
     os.system('rm -rf rules/')
 
 if __name__ == "__main__":
