@@ -336,7 +336,7 @@ def getIP(srcIp, dstIp):
 def writeSignatures(ruleFile):
     i = 1
 
-    outputFile = 'emerging-exploit.sig'
+    outputFile = ruleFile.split('.')[0] + '.sig'
     outputWriter = open(sig_output + outputFile, 'w+')
 
     print("Starting to compose rules...")
